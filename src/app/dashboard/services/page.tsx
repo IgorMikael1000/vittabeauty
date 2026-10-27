@@ -14,7 +14,9 @@ const currency = new Intl.NumberFormat("pt-BR", {
 });
 
 export default async function ServicesPage() {
-  const professionalId = await getAuthenticatedProfessionalId();
+  const professionalId = await getAuthenticatedProfessionalId({
+    allowExpired: true,
+  });
   const prisma = getPrismaClient();
   const [services, professional] = await Promise.all([
     prisma.service.findMany({

@@ -9,7 +9,9 @@ export const metadata: Metadata = {
 };
 
 export default async function AccountDetailsPage() {
-  const professionalId = await getAuthenticatedProfessionalId();
+  const professionalId = await getAuthenticatedProfessionalId({
+    allowExpired: true,
+  });
   const professional = await getPrismaClient().professional.findUniqueOrThrow({
     where: { id: professionalId },
     select: {

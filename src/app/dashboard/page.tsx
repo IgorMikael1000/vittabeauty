@@ -56,7 +56,9 @@ const dashboardItems = [
 ] as const;
 
 export default async function DashboardPage() {
-  const professionalId = await getAuthenticatedProfessionalId();
+  const professionalId = await getAuthenticatedProfessionalId({
+    allowExpired: true,
+  });
   const prisma = getPrismaClient();
   const professional = await prisma.professional.findUnique({
     where: { id: professionalId },

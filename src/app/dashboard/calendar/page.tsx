@@ -53,7 +53,9 @@ export default async function CalendarPage({
 }: {
   searchParams: Promise<{ date?: string; view?: string }>;
 }) {
-  const professionalId = await getAuthenticatedProfessionalId();
+  const professionalId = await getAuthenticatedProfessionalId({
+    allowExpired: true,
+  });
   const params = await searchParams;
   const prisma = getPrismaClient();
   const professional = await prisma.professional.findUniqueOrThrow({

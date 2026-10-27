@@ -36,7 +36,9 @@ const icons = {
 } as const;
 
 export default async function AccountPage() {
-  const professionalId = await getAuthenticatedProfessionalId();
+  const professionalId = await getAuthenticatedProfessionalId({
+    allowExpired: true,
+  });
   const professional = await getPrismaClient().professional.findUniqueOrThrow({
     where: { id: professionalId },
     select: { name: true, specialty: true, logoUrl: true },

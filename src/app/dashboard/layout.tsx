@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { HelpCircle } from "lucide-react";
 import { logoutAction } from "@/app/actions/auth";
 import { auth } from "@/auth";
 import { DashboardNavigation } from "@/components/dashboard/dashboard-navigation";
@@ -63,7 +64,11 @@ export default async function DashboardLayout({
 
   return (
     <>
-      <div className="flex flex-1 flex-col md:flex-row">
+      <div
+        aria-hidden={isExpired}
+        className="flex flex-1 flex-col md:flex-row"
+        inert={isExpired}
+      >
       <aside className="min-w-0 border-b border-[#e9e1ed]/80 bg-white/70 px-4 pb-2 pt-5 backdrop-blur-xl md:sticky md:top-0 md:h-screen md:w-[258px] md:shrink-0 md:border-b-0 md:border-r md:px-5 md:pb-6 md:pt-8">
         <Link
           aria-label="Vitta Beauty — início"
@@ -142,6 +147,13 @@ export default async function DashboardLayout({
                 Sair
               </button>
             </form>
+            <Link
+              className="inline-flex items-center gap-1.5 rounded-full bg-vitta px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-vitta/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vitta focus-visible:ring-offset-2"
+              href="/dashboard/ajuda"
+            >
+              <HelpCircle aria-hidden="true" className="h-4 w-4" />
+              Me ajude
+            </Link>
           </div>
         </header>
         <div className="flex-1 px-4 py-7 sm:px-8 sm:py-9 md:px-10">{children}</div>
@@ -188,7 +200,7 @@ export default async function DashboardLayout({
           </section>
         </div>
       )}
-      {!professional.hasSeenWelcome && (
+      {!isExpired && !professional.hasSeenWelcome && (
         <WelcomeTour trialEndsAt={trialEndsAt} />
       )}
     </>

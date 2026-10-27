@@ -23,7 +23,9 @@ export default async function ReportsPage({
 }: {
   searchParams: Promise<{ from?: string; to?: string }>;
 }) {
-  const professionalId = await getAuthenticatedProfessionalId();
+  const professionalId = await getAuthenticatedProfessionalId({
+    allowExpired: true,
+  });
   const query = await searchParams;
   const prisma = getPrismaClient();
   const professional = await prisma.professional.findUniqueOrThrow({

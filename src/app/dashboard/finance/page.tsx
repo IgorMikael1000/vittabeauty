@@ -37,7 +37,9 @@ export default async function FinancePage({
 }: {
   searchParams: Promise<{ from?: string; to?: string; view?: string }>;
 }) {
-  const professionalId = await getAuthenticatedProfessionalId();
+  const professionalId = await getAuthenticatedProfessionalId({
+    allowExpired: true,
+  });
   const query = await searchParams;
   const prisma = getPrismaClient();
   const professional = await prisma.professional.findUniqueOrThrow({
