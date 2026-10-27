@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { PlanCards } from "@/components/subscription/plan-cards";
 import { getAuthenticatedProfessionalId } from "@/lib/authenticated-professional";
 import { getPrismaClient } from "@/lib/prisma";
@@ -20,7 +21,7 @@ export default async function SubscriptionPage() {
   const professionalId = await getAuthenticatedProfessionalId({
     allowExpired: true,
   });
-  const professional = await getPrismaClient().professional.findUniqueOrThrow({
+  const professional = await getPrismaClient().professional.findUnique({
     where: { id: professionalId },
     select: {
       subscriptionStatus: true,
@@ -29,6 +30,9 @@ export default async function SubscriptionPage() {
       mpSubscriptionId: true,
     },
   });
+  if (!professional) {
+    redirect("/login");
+  }
   const currentPlan =
     professional.planType in subscriptionPlans
       ? subscriptionPlans[

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getAuthenticatedProfessionalId } from "@/lib/authenticated-professional";
 import { sumMoneyCents } from "@/lib/money";
@@ -59,10 +60,13 @@ export default async function DashboardPage() {
   const session = await auth();
   const professionalId = await getAuthenticatedProfessionalId();
   const prisma = getPrismaClient();
-  const professional = await prisma.professional.findUniqueOrThrow({
+  const professional = await prisma.professional.findUnique({
     where: { id: professionalId },
     select: { timezone: true },
   });
+  if (!professional) {
+    redirect("/login");
+  }
   const now = new Date();
   const today = getCalendarRange(undefined, "day", professional.timezone);
   const [nextAppointment, pendingAppointments, completedAppointments, income] =

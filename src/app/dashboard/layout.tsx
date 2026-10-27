@@ -17,7 +17,7 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  const professional = await getPrismaClient().professional.findUniqueOrThrow({
+  const professional = await getPrismaClient().professional.findUnique({
     where: { id: session.user.id },
     select: {
       id: true,
@@ -29,6 +29,9 @@ export default async function DashboardLayout({
       planType: true,
     },
   });
+  if (!professional) {
+    redirect("/login");
+  }
 
   if (professional.expiresAt <= new Date()) {
     if (professional.subscriptionStatus !== "EXPIRED") {
