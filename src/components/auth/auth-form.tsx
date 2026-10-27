@@ -21,12 +21,15 @@ export function AuthForm({ mode, registered = false }: AuthFormProps) {
   const isRegister = mode === "register";
 
   return (
-    <section className="w-full max-w-md rounded-2xl border border-vitta-border bg-vitta-surface p-7 shadow-card sm:p-9">
+    <section className="w-full max-w-md rounded-[28px] border border-white/80 bg-white/90 p-7 shadow-[0_24px_70px_rgba(66,47,78,0.12)] backdrop-blur-xl sm:p-9">
       <div className="mb-8">
-        <p className="mb-2 text-sm font-semibold uppercase tracking-[0.16em] text-vitta">
+        <p className="mb-5 inline-flex items-center gap-2.5 text-[15px] font-semibold tracking-[-0.03em] text-[#49345c]">
+          <span className="flex h-9 w-9 items-center justify-center rounded-[13px] bg-gradient-to-br from-[#7950a5] to-[#b47eb8] text-base text-white shadow-[0_6px_16px_rgba(121,80,165,0.2)]">
+            V
+          </span>
           Vitta Beauty
         </p>
-        <h1 className="text-2xl font-semibold text-vitta-text">
+        <h1 className="text-[28px] font-semibold tracking-[-0.04em] text-vitta-text">
           {isRegister ? "Crie sua conta" : "Bem-vinda de volta"}
         </h1>
         <p className="mt-2 text-sm leading-6 text-vitta-muted">
@@ -60,7 +63,7 @@ export function AuthForm({ mode, registered = false }: AuthFormProps) {
             Nome profissional
             <input
               autoComplete="name"
-              className="mt-2 w-full rounded-xl border border-vitta-border bg-white px-4 py-3 text-vitta-text outline-none transition focus:border-vitta focus:ring-2 focus:ring-vitta/15"
+              className="mt-2 w-full rounded-2xl border border-[#e9e3ed] bg-[#fcfbfd] px-4 py-3.5 text-vitta-text outline-none transition"
               maxLength={80}
               name="name"
               required
@@ -73,7 +76,7 @@ export function AuthForm({ mode, registered = false }: AuthFormProps) {
           E-mail
           <input
             autoComplete="email"
-            className="mt-2 w-full rounded-xl border border-vitta-border bg-white px-4 py-3 text-vitta-text outline-none transition focus:border-vitta focus:ring-2 focus:ring-vitta/15"
+            className="mt-2 w-full rounded-2xl border border-[#e9e3ed] bg-[#fcfbfd] px-4 py-3.5 text-vitta-text outline-none transition"
             maxLength={254}
             name="email"
             required
@@ -85,7 +88,7 @@ export function AuthForm({ mode, registered = false }: AuthFormProps) {
           Senha
           <input
             autoComplete={isRegister ? "new-password" : "current-password"}
-            className="mt-2 w-full rounded-xl border border-vitta-border bg-white px-4 py-3 text-vitta-text outline-none transition focus:border-vitta focus:ring-2 focus:ring-vitta/15"
+            className="mt-2 w-full rounded-2xl border border-[#e9e3ed] bg-[#fcfbfd] px-4 py-3.5 text-vitta-text outline-none transition"
             maxLength={72}
             minLength={isRegister ? 8 : undefined}
             name="password"
@@ -100,7 +103,7 @@ export function AuthForm({ mode, registered = false }: AuthFormProps) {
         </label>
 
         <button
-          className="w-full rounded-xl bg-vitta px-5 py-3 font-semibold text-white transition hover:bg-vitta/90 focus:outline-none focus:ring-2 focus:ring-vitta focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-2xl bg-gradient-to-r from-[#7950a5] to-[#9368b3] px-5 py-3.5 font-semibold text-white shadow-[0_8px_18px_rgba(121,80,165,0.2)] transition hover:-translate-y-0.5 hover:shadow-[0_11px_22px_rgba(121,80,165,0.25)] disabled:cursor-not-allowed disabled:opacity-60"
           disabled={pending}
           type="submit"
         >

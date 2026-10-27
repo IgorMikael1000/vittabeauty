@@ -2,8 +2,77 @@
 @tailwind components;
 @tailwind utilities;
 
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: rgb(121 80 165 / 18%);
+  color: #49315f;
+}
+
+html {
+  color-scheme: light;
+  scroll-behavior: smooth;
+}
+
 body {
-  background: #f8f5fa;
-  color: #352b3d;
-  font-family: Arial, Helvetica, sans-serif;
+  background:
+    radial-gradient(ellipse at 82% 0%, rgb(239 220 242 / 42%), transparent 34rem),
+    #f7f5f9;
+  color: #30283a;
+  font-family:
+    -apple-system, BlinkMacSystemFont, system-ui, "SF Pro Display", "SF Pro Text",
+    "Helvetica Neue", sans-serif;
+  font-feature-settings: "ss01" on;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+a {
+  touch-action: manipulation;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgb(121 80 165 / 34%);
+  outline-offset: 3px;
+}
+
+input,
+select,
+textarea {
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: #9c76bd;
+  box-shadow: 0 0 0 4px rgb(121 80 165 / 10%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

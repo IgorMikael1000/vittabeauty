@@ -20,7 +20,7 @@ const config: Config = {
         },
       },
       boxShadow: {
-        card: "0 12px 32px rgb(53 43 61 / 8%)",
+        card: "0 12px 36px rgb(48 40 58 / 6%), 0 2px 8px rgb(48 40 58 / 3%)",
       },
     },
   },
