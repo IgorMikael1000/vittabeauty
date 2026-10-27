@@ -7,7 +7,24 @@ export const metadata: Metadata = {
     default: "Vitta Beauty",
     template: "%s | Vitta Beauty",
   },
+  applicationName: "Vitta Beauty",
   description: "Gestão simples e acolhedora para profissionais da beleza.",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "32x32", type: "image/x-icon" },
+      { url: "/icons/vitta-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/vitta-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      { url: "/icons/vitta-apple-180.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
+  appleWebApp: {
+    capable: true,
+    title: "Vitta Beauty",
+    statusBarStyle: "default",
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
