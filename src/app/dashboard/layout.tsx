@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { logoutAction } from "@/app/actions/auth";
 import { auth } from "@/auth";
 import { DashboardNavigation } from "@/components/dashboard/dashboard-navigation";
+import { PlanCards } from "@/components/subscription/plan-cards";
 import { getPrismaClient } from "@/lib/prisma";
 
 export default async function DashboardLayout({
@@ -18,8 +19,67 @@ export default async function DashboardLayout({
 
   const professional = await getPrismaClient().professional.findUniqueOrThrow({
     where: { id: session.user.id },
-    select: { name: true, specialty: true, logoUrl: true },
+    select: {
+      id: true,
+      name: true,
+      specialty: true,
+      logoUrl: true,
+      expiresAt: true,
+      subscriptionStatus: true,
+      planType: true,
+    },
   });
+
+  if (professional.expiresAt <= new Date()) {
+    if (professional.subscriptionStatus !== "EXPIRED") {
+      await getPrismaClient().professional.updateMany({
+        where: {
+          id: professional.id,
+          expiresAt: { lte: new Date() },
+          subscriptionStatus: { not: "EXPIRED" },
+        },
+        data: { subscriptionStatus: "EXPIRED" },
+      });
+    }
+
+    return (
+      <main className="fixed inset-0 z-[100] overflow-y-auto bg-[#f7f3fa]/95 px-4 py-8 backdrop-blur-md sm:px-8 sm:py-12">
+        <section
+          aria-labelledby="subscription-gate-title"
+          aria-modal="true"
+          className="mx-auto my-auto w-full max-w-5xl rounded-[28px] border border-vitta-border bg-white p-5 shadow-[0_24px_80px_rgba(54,34,72,0.2)] sm:p-8 lg:p-10"
+          role="dialog"
+        >
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vitta">
+            Vitta Beauty · Assinatura
+          </p>
+          <h1
+            className="mt-2 text-2xl font-semibold tracking-tight text-vitta-text sm:text-3xl"
+            id="subscription-gate-title"
+          >
+            {professional.planType === "FREE"
+              ? "Seu período grátis terminou"
+              : "Sua assinatura venceu"}
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-vitta-muted">
+            Escolha um plano para continuar usando o Vitta Beauty e manter seu
+            espaço profissional disponível.
+          </p>
+          <div className="mt-7">
+            <PlanCards />
+          </div>
+          <form action={logoutAction} className="mt-6 text-center">
+            <button
+              className="text-sm font-medium text-vitta-muted underline underline-offset-4 hover:text-vitta"
+              type="submit"
+            >
+              Sair da conta
+            </button>
+          </form>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <div className="flex flex-1 flex-col md:flex-row">

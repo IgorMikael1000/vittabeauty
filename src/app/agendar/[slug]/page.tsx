@@ -62,6 +62,7 @@ export default async function PublicBookingPage({
       id: true,
       name: true,
       timezone: true,
+      expiresAt: true,
       pixKey: true,
       phone: true,
       services: {
@@ -81,6 +82,30 @@ export default async function PublicBookingPage({
 
   if (!professional) {
     notFound();
+  }
+
+  if (professional.expiresAt <= new Date()) {
+    return (
+      <section className="mx-auto w-full max-w-2xl px-4 py-12 sm:px-6 sm:py-20">
+        <div className="rounded-2xl border border-vitta-border bg-white p-8 text-center shadow-card sm:p-12">
+          <Image
+            alt="Vitta Beauty"
+            className="mx-auto h-[76px] w-[170px] object-contain"
+            height={360}
+            priority
+            src="/brand/logo_vitta.png"
+            width={640}
+          />
+          <h1 className="mt-6 text-2xl font-semibold text-vitta-text">
+            Agendamentos temporariamente indisponíveis
+          </h1>
+          <p className="mt-3 text-sm leading-6 text-vitta-muted">
+            Este profissional está temporariamente indisponível para
+            agendamentos online.
+          </p>
+        </div>
+      </section>
+    );
   }
 
   const successfulBooking =
@@ -225,14 +250,13 @@ export default async function PublicBookingPage({
               role="status"
             >
               <p>
-                Sua solicitação foi enviada. Aguarde a confirmação da
-                profissional pelo WhatsApp.
+                Sua solicitação foi enviada.
               </p>
               {successfulBooking && depositValue > 0 && (
                 <div className="space-y-3 border-t border-emerald-200 pt-4">
                   <div>
                     <h2 className="font-semibold">
-                      Sinal necessário para confirmar
+                      Sinal necessário para confirmar seu agendamento
                     </h2>
                     <p className="mt-1">
                       Envie o sinal de{" "}

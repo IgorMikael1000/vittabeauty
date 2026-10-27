@@ -21,11 +21,18 @@ const accountOptions = [
     description: "Confirme sua senha atual e escolha uma nova.",
     icon: "security",
   },
+  {
+    href: "/dashboard/conta/assinatura",
+    title: "Assinatura",
+    description: "Consulte seu plano e gerencie os pagamentos.",
+    icon: "subscription",
+  },
 ] as const;
 
 const icons = {
   profile: "M20 21a8 8 0 0 0-16 0m8-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z",
   security: "M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Zm-3-11 2 2 4-4",
+  subscription: "M3 7h18M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm3 9h8",
 } as const;
 
 export default async function AccountPage() {

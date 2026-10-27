@@ -170,6 +170,9 @@ export async function registerAction(
           specialty,
           passwordHash,
           slug,
+          subscriptionStatus: "TRIAL",
+          planType: "FREE",
+          expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
         },
       });
 

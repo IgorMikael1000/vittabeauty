@@ -150,6 +150,17 @@ apagar os valores existentes nela.
 - Senhas bcrypt são limitadas a 72 bytes tanto no cadastro quanto no login.
 - Configure também limites de requisição no provedor de borda para login,
   cadastro e envio de solicitações públicas antes da exposição à internet.
+- O trial profissional dura três dias a partir do cadastro. Após o vencimento,
+  o dashboard exige a escolha de um plano; o link público de agendamento fica
+  indisponível até a assinatura ser ativada.
+- As assinaturas recorrentes usam o SDK oficial do Mercado Pago. Configure
+  `MERCADOPAGO_ACCESS_TOKEN` e `MERCADOPAGO_WEBHOOK_SECRET` no ambiente de
+  execução. O checkout envia notificações para
+  `/api/webhooks/mercadopago`; habilite os eventos
+  `subscription_preapproval` e `subscription_authorized_payment`.
+- Os pagamentos são deduplicados pelo ID da fatura do Mercado Pago. A validação
+  HMAC do webhook exige os cabeçalhos assinados e rejeita notificações com mais
+  de cinco minutos.
 
 ## Deploy na Vercel
 
@@ -161,6 +172,9 @@ variáveis no projeto antes do primeiro deploy:
 - `AUTH_SECRET`: segredo aleatório forte e exclusivo de produção.
 - `NEXT_PUBLIC_APP_URL`: origem pública HTTPS, por exemplo
   `https://seu-dominio.com`.
+- `MERCADOPAGO_ACCESS_TOKEN`: token de acesso de produção do Mercado Pago.
+- `MERCADOPAGO_WEBHOOK_SECRET`: segredo de assinatura dos webhooks do Mercado
+  Pago.
 
 O build executa `prisma generate && next build`. Alterações ao schema do banco
 devem ser aplicadas explicitamente com `npm run db:push` ou migrations antes

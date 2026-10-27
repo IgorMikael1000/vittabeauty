@@ -58,11 +58,18 @@ export async function createPublicBookingAction(
   const prisma = getPrismaClient();
   const professional = await prisma.professional.findUnique({
     where: { slug },
-    select: { id: true, timezone: true, pixKey: true },
+    select: { id: true, timezone: true, pixKey: true, expiresAt: true },
   });
 
   if (!professional) {
     return { error: "Este link de agendamento não está disponível." };
+  }
+
+  if (professional.expiresAt <= new Date()) {
+    return {
+      error:
+        "Este profissional está temporariamente indisponível para agendamentos online.",
+    };
   }
 
   if (!isValidBookingDate(date, professional.timezone)) {
