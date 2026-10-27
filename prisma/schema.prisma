@@ -1,0 +1,150 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum TransactionStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+model Professional {
+  id           String        @id @default(cuid())
+  name         String
+  email        String        @unique
+  passwordHash String
+  slug         String        @unique
+  timezone     String        @default("America/Sao_Paulo")
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  clients      Client[]
+  services     Service[]
+  appointments Appointment[]
+  transactions Transaction[]
+  workingHours WorkingHours[]
+  calendarBlocks CalendarBlock[]
+
+  @@index([createdAt])
+}
+
+model Client {
+  id                 String        @id @default(cuid())
+  professionalId     String
+  name               String
+  whatsapp           String
+  birthday           DateTime?     @db.Date
+  preferredServiceId String?
+  notes              String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  professional       Professional  @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  preferredService   Service?      @relation("PreferredService", fields: [preferredServiceId, professionalId], references: [id, professionalId], onDelete: Restrict)
+  appointments       Appointment[] @relation("ClientAppointments")
+
+  @@unique([id, professionalId])
+  @@index([professionalId, name])
+  @@index([professionalId, whatsapp])
+}
+
+model Service {
+  id                  String        @id @default(cuid())
+  professionalId      String
+  name                String
+  description         String?
+  price               Decimal       @db.Decimal(10, 2)
+  durationMinutes     Int
+  onlineBookingEnabled Boolean     @default(true)
+  isActive            Boolean       @default(true)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  professional        Professional  @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  preferredBy         Client[]      @relation("PreferredService")
+  appointments        Appointment[]
+
+  @@unique([id, professionalId])
+  @@index([professionalId, isActive])
+}
+
+model Appointment {
+  id             String            @id @default(cuid())
+  professionalId String
+  clientId       String
+  serviceId      String
+  startsAt       DateTime
+  endsAt         DateTime
+  status         AppointmentStatus @default(PENDING)
+  priceAtBooking Decimal           @db.Decimal(10, 2)
+  notes          String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  professional   Professional      @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  client         Client            @relation("ClientAppointments", fields: [clientId, professionalId], references: [id, professionalId], onDelete: Restrict)
+  service        Service           @relation(fields: [serviceId, professionalId], references: [id, professionalId], onDelete: Restrict)
+  transactions   Transaction[]
+
+  @@unique([id, professionalId])
+  @@index([professionalId, startsAt])
+  @@index([professionalId, status, startsAt])
+}
+
+model WorkingHours {
+  id             String       @id @default(cuid())
+  professionalId String
+  weekday        Int
+  startMinute    Int
+  endMinute      Int
+  isActive       Boolean      @default(true)
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@unique([professionalId, weekday])
+}
+
+model CalendarBlock {
+  id             String       @id @default(cuid())
+  professionalId String
+  startsAt       DateTime
+  endsAt         DateTime
+  reason         String?
+  createdAt      DateTime     @default(now())
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@index([professionalId, startsAt])
+}
+
+model Transaction {
+  id             String            @id @default(cuid())
+  professionalId String
+  appointmentId  String?           @unique
+  type           TransactionType
+  status         TransactionStatus @default(PENDING)
+  amount         Decimal           @db.Decimal(10, 2)
+  description    String
+  category       String?
+  dueAt          DateTime?
+  paidAt         DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  professional   Professional      @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  appointment    Appointment?      @relation(fields: [appointmentId, professionalId], references: [id, professionalId], onDelete: Restrict)
+
+  @@index([professionalId, type, status])
+  @@index([professionalId, dueAt])
+}
