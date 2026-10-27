@@ -33,7 +33,8 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  if (professional.expiresAt <= new Date()) {
+  const isExpired = professional.expiresAt <= new Date();
+  if (isExpired) {
     if (professional.subscriptionStatus !== "EXPIRED") {
       await getPrismaClient().professional.updateMany({
         where: {
@@ -44,48 +45,17 @@ export default async function DashboardLayout({
         data: { subscriptionStatus: "EXPIRED" },
       });
     }
-
-    return (
-      <main className="fixed inset-0 z-[100] overflow-y-auto bg-[#f7f3fa]/95 px-4 py-8 backdrop-blur-md sm:px-8 sm:py-12">
-        <section
-          aria-labelledby="subscription-gate-title"
-          aria-modal="true"
-          className="mx-auto my-auto w-full max-w-5xl rounded-[28px] border border-vitta-border bg-white p-5 shadow-[0_24px_80px_rgba(54,34,72,0.2)] sm:p-8 lg:p-10"
-          role="dialog"
-        >
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vitta">
-            Vitta Beauty · Assinatura
-          </p>
-          <h1
-            className="mt-2 text-2xl font-semibold tracking-tight text-vitta-text sm:text-3xl"
-            id="subscription-gate-title"
-          >
-            {professional.planType === "FREE"
-              ? "Seu período grátis terminou"
-              : "Sua assinatura venceu"}
-          </h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-vitta-muted">
-            Escolha um plano para continuar usando o Vitta Beauty e manter seu
-            espaço profissional disponível.
-          </p>
-          <div className="mt-7">
-            <PlanCards />
-          </div>
-          <form action={logoutAction} className="mt-6 text-center">
-            <button
-              className="text-sm font-medium text-vitta-muted underline underline-offset-4 hover:text-vitta"
-              type="submit"
-            >
-              Sair da conta
-            </button>
-          </form>
-        </section>
-      </main>
-    );
   }
 
+  const expirationLabel = new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "long",
+    timeStyle: "short",
+    timeZone: "America/Sao_Paulo",
+  }).format(professional.expiresAt);
+
   return (
-    <div className="flex flex-1 flex-col md:flex-row">
+    <>
+      <div className="flex flex-1 flex-col md:flex-row">
       <aside className="min-w-0 border-b border-[#e9e1ed]/80 bg-white/70 px-4 pb-2 pt-5 backdrop-blur-xl md:sticky md:top-0 md:h-screen md:w-[258px] md:shrink-0 md:border-b-0 md:border-r md:px-5 md:pb-6 md:pt-8">
         <Link
           aria-label="Vitta Beauty — início"
@@ -160,6 +130,48 @@ export default async function DashboardLayout({
         </header>
         <div className="flex-1 px-4 py-7 sm:px-8 sm:py-9 md:px-10">{children}</div>
       </div>
-    </div>
+      </div>
+      {isExpired && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/40 px-3 py-5 backdrop-blur-lg sm:px-6 sm:py-8">
+          <section
+            aria-labelledby="subscription-gate-title"
+            aria-modal="true"
+            className="my-auto max-h-full w-full max-w-6xl overflow-y-auto rounded-[28px] border border-vitta-border bg-white p-5 shadow-[0_24px_80px_rgba(30,18,40,0.35)] sm:p-8 lg:p-10"
+            role="dialog"
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vitta">
+              Vitta Beauty · Assinatura
+            </p>
+            <h1
+              className="mt-2 text-2xl font-semibold tracking-tight text-vitta-text sm:text-3xl"
+              id="subscription-gate-title"
+            >
+              {professional.planType === "FREE"
+                ? "Seu período grátis terminou"
+                : "Sua assinatura venceu"}
+            </h1>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-vitta-muted">
+              O acesso ao Vitta Beauty foi bloqueado porque seu período de
+              utilização terminou em{" "}
+              <strong className="font-semibold text-vitta-text">
+                {expirationLabel}
+              </strong>
+              . Selecione um plano para regularizar o acesso.
+            </p>
+            <div className="mt-7 overflow-x-auto pb-2">
+              <PlanCards horizontal />
+            </div>
+            <form action={logoutAction} className="mt-5 text-center">
+              <button
+                className="text-sm font-medium text-vitta-muted underline underline-offset-4 hover:text-vitta"
+                type="submit"
+              >
+                Sair da conta
+              </button>
+            </form>
+          </section>
+        </div>
+      )}
+    </>
   );
 }

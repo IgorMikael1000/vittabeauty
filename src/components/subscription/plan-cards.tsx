@@ -40,13 +40,19 @@ function SubscribeButton({ planType }: { planType: SubscriptionPlanType }) {
   );
 }
 
-export function PlanCards() {
+export function PlanCards({ horizontal = false }: { horizontal?: boolean }) {
   const planTypes = Object.keys(
     subscriptionPlans,
   ) as SubscriptionPlanType[];
 
   return (
-    <div className="grid gap-4 md:grid-cols-3">
+    <div
+      className={
+        horizontal
+          ? "grid min-w-[780px] grid-cols-3 gap-4"
+          : "grid gap-4 md:grid-cols-3"
+      }
+    >
       {planTypes.map((planType) => {
         const plan = subscriptionPlans[planType];
         const isAnnual = planType === "ANNUAL";

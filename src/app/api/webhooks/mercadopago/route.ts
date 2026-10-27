@@ -8,6 +8,7 @@ import {
 import { Prisma } from "@/generated/prisma/client";
 import { NextResponse, type NextRequest } from "next/server";
 import { getPrismaClient } from "@/lib/prisma";
+import { applyApprovedCheckoutPayment } from "@/lib/subscription-payments";
 import {
   isSubscriptionPlanType,
   subscriptionPlans,
@@ -177,49 +178,11 @@ async function handlePreferencePayment(paymentId: string): Promise<void> {
   const paidAt = Number.isNaN(paidAtCandidate.getTime())
     ? new Date()
     : paidAtCandidate;
-  const plan = subscriptionPlans[reference.planType];
-
-  try {
-    await getPrismaClient().$transaction(async (transaction) => {
-      await transaction.subscriptionPayment.create({
-        data: {
-          mercadoPagoPaymentId: paymentId,
-          professionalId: reference.professionalId,
-          planType: reference.planType,
-          paidAt,
-        },
-      });
-
-      const professional = await transaction.professional.findUnique({
-        where: { id: reference.professionalId },
-        select: { expiresAt: true },
-      });
-      if (!professional) {
-        throw new Error("Checkout payment references an unknown account.");
-      }
-
-      const baseTime = Math.max(
-        professional.expiresAt.getTime(),
-        paidAt.getTime(),
-      );
-      await transaction.professional.update({
-        where: { id: reference.professionalId },
-        data: {
-          subscriptionStatus: "ACTIVE",
-          planType: reference.planType,
-          expiresAt: new Date(baseTime + plan.durationDays * 24 * 60 * 60 * 1000),
-        },
-      });
-    });
-  } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
-      return;
-    }
-    throw error;
-  }
+  await applyApprovedCheckoutPayment({
+    paymentId,
+    externalReference: payment.external_reference,
+    paidAt,
+  });
 }
 
 export async function POST(request: NextRequest) {
