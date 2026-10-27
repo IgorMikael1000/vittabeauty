@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { auth } from "@/auth";
+import { getAuthenticatedProfessionalId } from "@/lib/authenticated-professional";
+import { sumMoneyCents } from "@/lib/money";
+import { getPrismaClient } from "@/lib/prisma";
+import { formatTime, getCalendarRange } from "@/lib/schedule";
 
 export const metadata: Metadata = {
   title: "Visão geral",
@@ -53,13 +57,123 @@ const dashboardItems = [
 
 export default async function DashboardPage() {
   const session = await auth();
+  const professionalId = await getAuthenticatedProfessionalId();
+  const prisma = getPrismaClient();
+  const professional = await prisma.professional.findUniqueOrThrow({
+    where: { id: professionalId },
+    select: { timezone: true },
+  });
+  const now = new Date();
+  const today = getCalendarRange(undefined, "day", professional.timezone);
+  const [nextAppointment, pendingAppointments, completedAppointments, income] =
+    await Promise.all([
+      prisma.appointment.findFirst({
+        where: {
+          professionalId,
+          status: { in: ["PENDING", "CONFIRMED"] },
+          startsAt: { gte: now },
+        },
+        orderBy: { startsAt: "asc" },
+        select: {
+          startsAt: true,
+          client: { select: { name: true } },
+          service: { select: { name: true } },
+        },
+      }),
+      prisma.appointment.count({
+        where: {
+          professionalId,
+          status: "PENDING",
+          startsAt: { gte: now },
+        },
+      }),
+      prisma.appointment.count({
+        where: {
+          professionalId,
+          status: "COMPLETED",
+          startsAt: { gte: today.start, lt: today.end },
+        },
+      }),
+      prisma.transaction.findMany({
+        where: {
+          professionalId,
+          type: "INCOME",
+          OR: [
+            {
+              status: "PAID",
+              paidAt: { gte: today.start, lt: today.end },
+            },
+            {
+              status: "PENDING",
+              dueAt: { gte: today.start, lt: today.end },
+            },
+            {
+              status: "PENDING",
+              dueAt: null,
+              createdAt: { gte: today.start, lt: today.end },
+            },
+          ],
+        },
+        select: { amount: true, status: true },
+      }),
+    ]);
+
+  const receivedTodayCents = sumMoneyCents(
+    income.filter((transaction) => transaction.status === "PAID"),
+  );
+  const expectedTodayCents = sumMoneyCents(
+    income.filter((transaction) => transaction.status === "PENDING"),
+  );
+  const currency = new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
+  const widgets = [
+    {
+      href: "/dashboard/calendar",
+      label: "Próximo atendimento",
+      value: nextAppointment
+        ? formatTime(nextAppointment.startsAt, professional.timezone)
+        : "Agenda livre",
+      detail: nextAppointment
+        ? `${nextAppointment.client.name} · ${nextAppointment.service.name}`
+        : "Nenhum atendimento futuro",
+      icon: "calendar",
+    },
+    {
+      href: "/dashboard/calendar",
+      label: "Aguardando confirmação",
+      value: String(pendingAppointments),
+      detail:
+        pendingAppointments === 1
+          ? "1 agendamento pendente"
+          : "agendamentos pendentes",
+      icon: "pending",
+    },
+    {
+      href: "/dashboard/finance",
+      label: "Faturamento de hoje",
+      value: currency.format(receivedTodayCents / 100),
+      detail: `Previsto: ${currency.format(expectedTodayCents / 100)}`,
+      icon: "finance",
+    },
+    {
+      href: "/dashboard/calendar",
+      label: "Atendimentos realizados",
+      value: String(completedAppointments),
+      detail:
+        completedAppointments === 1 ? "concluído hoje" : "concluídos hoje",
+      icon: "completed",
+    },
+  ] as const;
 
   return (
     <section className="mx-auto w-full max-w-6xl">
-      <div className="relative isolate overflow-hidden rounded-[28px] bg-gradient-to-br from-[#56376f] via-[#7950a5] to-[#a875ae] px-6 py-8 shadow-[0_22px_55px_rgba(86,55,111,0.2)] sm:px-9 sm:py-10 lg:px-11 lg:py-12">
+      <div className="relative isolate overflow-hidden rounded-[28px] bg-gradient-to-br from-[#56376f] via-[#7950a5] to-[#a875ae] px-6 py-8 shadow-[0_22px_55px_rgba(86,55,111,0.2)] sm:px-9 sm:py-10 lg:px-11 lg:py-9">
         <div aria-hidden="true" className="absolute -right-12 -top-24 -z-10 h-72 w-72 rounded-full border border-white/10 bg-white/[0.04]" />
         <div aria-hidden="true" className="absolute -bottom-36 right-28 -z-10 h-72 w-72 rounded-full border border-white/10 bg-white/[0.04]" />
-        <div className="relative max-w-2xl">
+        <div className="relative grid gap-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-center lg:gap-9">
+        <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/65">
             Seu espaço, seu momento
           </p>
@@ -81,10 +195,33 @@ export default async function DashboardPage() {
             </svg>
           </Link>
         </div>
-        <div aria-hidden="true" className="absolute bottom-8 right-10 hidden h-36 w-36 items-center justify-center rounded-full border border-white/15 bg-white/[0.07] lg:flex">
-          <span className="flex h-24 w-24 items-center justify-center rounded-full border border-white/20 bg-white/[0.08] text-[54px] font-light text-white/90">
+        <div className="relative z-10 grid grid-cols-2 gap-2.5 sm:gap-3">
+          {widgets.map((widget) => (
+            <Link
+              className="group min-w-0 rounded-[18px] border border-white/15 bg-white/[0.11] p-3.5 text-white shadow-sm backdrop-blur-md transition hover:border-white/30 hover:bg-white/[0.17] sm:rounded-[20px] sm:p-4"
+              href={widget.href}
+              key={widget.label}
+            >
+              <span className="flex items-center gap-2 text-[10px] font-semibold uppercase leading-4 tracking-[0.1em] text-white/65 sm:text-[11px]">
+                <svg aria-hidden="true" className="h-4 w-4 shrink-0 text-white/75" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" viewBox="0 0 24 24">
+                  <path d={widgetIconPaths[widget.icon]} />
+                </svg>
+                <span className="truncate">{widget.label}</span>
+              </span>
+              <p className="mt-2 truncate text-lg font-semibold tracking-[-0.03em] sm:text-xl">
+                {widget.value}
+              </p>
+              <p className="mt-1 truncate text-[11px] leading-4 text-white/70 sm:text-xs">
+                {widget.detail}
+              </p>
+            </Link>
+          ))}
+        </div>
+        <div aria-hidden="true" className="pointer-events-none absolute bottom-2 right-3 -z-10 hidden h-28 w-28 items-center justify-center rounded-full border border-white/15 bg-white/[0.07] lg:flex">
+          <span className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full border border-white/20 bg-white/[0.08] text-[42px] font-light text-white/60">
             V
           </span>
+        </div>
         </div>
       </div>
 
@@ -139,4 +276,11 @@ const homeIconPaths = {
   link: "M10 13a5 5 0 0 0 7.07 0l3-3A5 5 0 0 0 13 2.93l-1.72 1.71m2.72 6.36a5 5 0 0 0-7.07 0l-3 3A5 5 0 0 0 11 21.07l1.71-1.71",
   finance: "M4 5h16v14H4zM8 15l3-3 2 2 4-5",
   reports: "M4 19V5m0 14h17M8 16v-4m5 4V8m5 8v-6",
+} as const;
+
+const widgetIconPaths = {
+  calendar: "M8 3v4m8-4v4M4 9h16M5 5h14a1 1 0 0 1 1 1v13H4V6a1 1 0 0 1 1-1Z",
+  pending: "M12 8v4l3 2m6-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z",
+  finance: "M4 5h16v14H4zM8 15l3-3 2 2 4-5",
+  completed: "m5 12 4 4L19 6",
 } as const;

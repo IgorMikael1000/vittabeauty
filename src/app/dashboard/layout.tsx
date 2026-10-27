@@ -18,7 +18,7 @@ export default async function DashboardLayout({
 
   const professional = await getPrismaClient().professional.findUniqueOrThrow({
     where: { id: session.user.id },
-    select: { name: true, specialty: true },
+    select: { name: true, specialty: true, logoUrl: true },
   });
 
   return (
@@ -67,9 +67,24 @@ export default async function DashboardLayout({
           </div>
           <div className="flex items-center gap-3">
             <span aria-hidden="true" className="hidden h-8 w-px bg-[#e9e1ed] sm:block" />
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#eedbee] to-[#f7e7ef] text-xs font-semibold text-[#714992]">
-              {professional.name.slice(0, 1).toUpperCase()}
-            </span>
+            <Link
+              aria-label="Abrir Minha Conta"
+              className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[#eedbee] to-[#f7e7ef] text-xs font-semibold text-[#714992] ring-offset-2 transition hover:ring-2 hover:ring-vitta/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vitta"
+              href="/dashboard/conta"
+            >
+              {professional.logoUrl ? (
+                <Image
+                  alt=""
+                  className="h-full w-full object-cover"
+                  height={36}
+                  src={professional.logoUrl}
+                  unoptimized
+                  width={36}
+                />
+              ) : (
+                professional.name.slice(0, 1).toLocaleUpperCase("pt-BR")
+              )}
+            </Link>
             <form action={logoutAction}>
               <button
                 className="rounded-full border border-[#e8e0ec] bg-white/80 px-3.5 py-2 text-xs font-semibold text-vitta-text/75 transition hover:border-vitta/30 hover:bg-white hover:text-vitta"

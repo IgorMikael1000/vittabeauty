@@ -129,14 +129,15 @@ export default async function ReportsPage({
       ? (cancelledCount / appointments.length) * 100
       : 0;
   const incomeReceivedCents = sumMoneyCents(incomeReceived);
-  const futureConfirmedAppointments = appointments.filter(
+  const futureAppointments = appointments.filter(
     (appointment) =>
-      appointment.status === "CONFIRMED" &&
+      (appointment.status === "PENDING" ||
+        appointment.status === "CONFIRMED") &&
       appointment.startsAt >= forecastFrom,
   );
   const incomeExpectedCents = sumMoneyCents([
     ...incomeExpected,
-    ...futureConfirmedAppointments.map((appointment) => ({
+    ...futureAppointments.map((appointment) => ({
       amount: appointment.priceAtBooking,
     })),
   ]);
@@ -144,7 +145,7 @@ export default async function ReportsPage({
   const expensesExpectedCents =
     sumMoneyCents(expensesExpected) +
     sumMoneyCents(
-      futureConfirmedAppointments.map((appointment) => ({
+      futureAppointments.map((appointment) => ({
         amount: appointment.service.materialCost,
       })),
     );
@@ -279,7 +280,7 @@ export default async function ReportsPage({
             {formatCents(expensesExpectedCents)}
           </p>
           <p className="mt-2 text-xs text-vitta-muted">
-            Despesas pendentes e materiais de atendimentos confirmados futuros
+            Despesas pendentes e materiais de agendamentos futuros pendentes ou confirmados
           </p>
         </article>
       </div>

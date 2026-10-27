@@ -119,7 +119,7 @@ apagar os valores existentes nela.
   atendimento e tipo evita lançamentos duplicados.
 - O financeiro permite registrar receitas e despesas independentes, informar
   valor, categoria, data prevista e marcar um lançamento como já pago/recebido.
-  O painel alterna entre valores previstos (atendimentos futuros confirmados,
+  O painel alterna entre valores previstos (atendimentos futuros pendentes ou confirmados,
   custos de material estimados e despesas pendentes) e realizados (transações
   pagas), apresentando faturamento bruto, custos de serviços, despesas fixas e
   lucro líquido.

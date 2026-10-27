@@ -49,7 +49,7 @@ export default async function FinancePage({
   const now = new Date();
   const forecastFrom = period.from > now ? period.from : now;
   const [
-    confirmedAppointments,
+    futureAppointments,
     forecastOtherIncome,
     forecastFixedExpenses,
     realizedIncome,
@@ -60,7 +60,7 @@ export default async function FinancePage({
     prisma.appointment.findMany({
       where: {
         professionalId,
-        status: "CONFIRMED",
+        status: { in: ["PENDING", "CONFIRMED"] },
         startsAt: { gte: forecastFrom, lt: period.to },
       },
       select: {
@@ -159,7 +159,7 @@ export default async function FinancePage({
   const grossIncomeCents = isRealized
     ? sumMoneyCents(realizedIncome)
     : sumMoneyCents([
-        ...confirmedAppointments.map((appointment) => ({
+        ...futureAppointments.map((appointment) => ({
           amount: appointment.priceAtBooking,
         })),
         ...forecastOtherIncome,
@@ -167,7 +167,7 @@ export default async function FinancePage({
   const serviceCostCents = isRealized
     ? sumMoneyCents(realizedServiceExpenses)
     : sumMoneyCents(
-        confirmedAppointments.map((appointment) => ({
+        futureAppointments.map((appointment) => ({
           amount: appointment.service.materialCost,
         })),
       );
@@ -182,14 +182,14 @@ export default async function FinancePage({
       value: formatCents(grossIncomeCents),
       description: isRealized
         ? "Receitas efetivamente pagas no período"
-        : "Atendimentos confirmados futuros e outras receitas previstas",
+        : "Agendamentos futuros pendentes ou confirmados e outras receitas previstas",
     },
     {
       label: "Custos de Serviços",
       value: formatCents(serviceCostCents),
       description: isRealized
         ? "Custos de material registrados em atendimentos concluídos"
-        : "Materiais estimados para atendimentos confirmados",
+        : "Materiais estimados para agendamentos pendentes ou confirmados",
     },
     {
       label: "Despesas Fixas",
