@@ -31,6 +31,8 @@ export default async function ReportsPage({
     select: { timezone: true },
   });
   const period = getReportPeriod(query.from, query.to, professional.timezone);
+  const now = new Date();
+  const forecastFrom = period.from > now ? period.from : now;
   const [incomeReceived, incomeExpected, expensesPaid, expensesExpected, appointments] =
     await Promise.all([
       prisma.transaction.findMany({
@@ -47,6 +49,7 @@ export default async function ReportsPage({
           professionalId,
           type: "INCOME",
           status: "PENDING",
+          appointmentId: null,
           OR: [
             { dueAt: { gte: period.from, lt: period.to } },
             {
@@ -71,6 +74,7 @@ export default async function ReportsPage({
           professionalId,
           type: "EXPENSE",
           status: "PENDING",
+          appointmentId: null,
           OR: [
             { dueAt: { gte: period.from, lt: period.to } },
             {
@@ -88,7 +92,11 @@ export default async function ReportsPage({
         },
         select: {
           status: true,
-          service: { select: { id: true, name: true } },
+          startsAt: true,
+          priceAtBooking: true,
+          service: {
+            select: { id: true, name: true, materialCost: true },
+          },
         },
       }),
     ]);
@@ -121,9 +129,25 @@ export default async function ReportsPage({
       ? (cancelledCount / appointments.length) * 100
       : 0;
   const incomeReceivedCents = sumMoneyCents(incomeReceived);
-  const incomeExpectedCents = sumMoneyCents(incomeExpected);
+  const futureConfirmedAppointments = appointments.filter(
+    (appointment) =>
+      appointment.status === "CONFIRMED" &&
+      appointment.startsAt >= forecastFrom,
+  );
+  const incomeExpectedCents = sumMoneyCents([
+    ...incomeExpected,
+    ...futureConfirmedAppointments.map((appointment) => ({
+      amount: appointment.priceAtBooking,
+    })),
+  ]);
   const expensesPaidCents = sumMoneyCents(expensesPaid);
-  const expensesExpectedCents = sumMoneyCents(expensesExpected);
+  const expensesExpectedCents =
+    sumMoneyCents(expensesExpected) +
+    sumMoneyCents(
+      futureConfirmedAppointments.map((appointment) => ({
+        amount: appointment.service.materialCost,
+      })),
+    );
   const periodLabel = `${period.fromDate} – ${period.toDate}`;
   const cards = [
     {
@@ -255,7 +279,7 @@ export default async function ReportsPage({
             {formatCents(expensesExpectedCents)}
           </p>
           <p className="mt-2 text-xs text-vitta-muted">
-            Despesas pendentes com data prevista no período
+            Despesas pendentes e materiais de atendimentos confirmados futuros
           </p>
         </article>
       </div>

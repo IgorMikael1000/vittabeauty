@@ -35,7 +35,7 @@ const statusLabels = {
 export default async function FinancePage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; view?: string }>;
 }) {
   const professionalId = await getAuthenticatedProfessionalId();
   const query = await searchParams;
@@ -45,18 +45,51 @@ export default async function FinancePage({
     select: { timezone: true },
   });
   const period = getReportPeriod(query.from, query.to, professional.timezone);
+  const isRealized = query.view === "realized";
+  const now = new Date();
+  const forecastFrom = period.from > now ? period.from : now;
   const [
-    expectedIncome,
-    receivedIncome,
-    expectedExpenses,
-    paidExpenses,
+    confirmedAppointments,
+    forecastOtherIncome,
+    forecastFixedExpenses,
+    realizedIncome,
+    realizedServiceExpenses,
+    realizedFixedExpenses,
     transactions,
   ] = await Promise.all([
+    prisma.appointment.findMany({
+      where: {
+        professionalId,
+        status: "CONFIRMED",
+        startsAt: { gte: forecastFrom, lt: period.to },
+      },
+      select: {
+        priceAtBooking: true,
+        service: { select: { materialCost: true } },
+      },
+    }),
     prisma.transaction.findMany({
       where: {
         professionalId,
         type: "INCOME",
         status: "PENDING",
+        appointmentId: null,
+        OR: [
+          { dueAt: { gte: period.from, lt: period.to } },
+          {
+            dueAt: null,
+            createdAt: { gte: period.from, lt: period.to },
+          },
+        ],
+      },
+      select: { amount: true },
+    }),
+    prisma.transaction.findMany({
+      where: {
+        professionalId,
+        type: "EXPENSE",
+        status: "PENDING",
+        appointmentId: null,
         OR: [
           { dueAt: { gte: period.from, lt: period.to } },
           {
@@ -80,14 +113,9 @@ export default async function FinancePage({
       where: {
         professionalId,
         type: "EXPENSE",
-        status: "PENDING",
-        OR: [
-          { dueAt: { gte: period.from, lt: period.to } },
-          {
-            dueAt: null,
-            createdAt: { gte: period.from, lt: period.to },
-          },
-        ],
+        status: "PAID",
+        appointmentId: { not: null },
+        paidAt: { gte: period.from, lt: period.to },
       },
       select: { amount: true },
     }),
@@ -96,6 +124,7 @@ export default async function FinancePage({
         professionalId,
         type: "EXPENSE",
         status: "PAID",
+        appointmentId: null,
         paidAt: { gte: period.from, lt: period.to },
       },
       select: { amount: true },
@@ -127,31 +156,54 @@ export default async function FinancePage({
       },
     }),
   ]);
-  const expectedIncomeCents = sumMoneyCents(expectedIncome);
-  const receivedIncomeCents = sumMoneyCents(receivedIncome);
-  const expectedExpenseCents = sumMoneyCents(expectedExpenses);
-  const paidExpenseCents = sumMoneyCents(paidExpenses);
-  const estimatedProfitCents = expectedIncomeCents - expectedExpenseCents;
+  const grossIncomeCents = isRealized
+    ? sumMoneyCents(realizedIncome)
+    : sumMoneyCents([
+        ...confirmedAppointments.map((appointment) => ({
+          amount: appointment.priceAtBooking,
+        })),
+        ...forecastOtherIncome,
+      ]);
+  const serviceCostCents = isRealized
+    ? sumMoneyCents(realizedServiceExpenses)
+    : sumMoneyCents(
+        confirmedAppointments.map((appointment) => ({
+          amount: appointment.service.materialCost,
+        })),
+      );
+  const fixedExpenseCents = isRealized
+    ? sumMoneyCents(realizedFixedExpenses)
+    : sumMoneyCents(forecastFixedExpenses);
+  const netProfitCents =
+    grossIncomeCents - serviceCostCents - fixedExpenseCents;
   const cards = [
     {
-      label: "Receitas previstas",
-      value: formatCents(expectedIncomeCents),
-      description: "Lançamentos pendentes no período",
+      label: "Faturamento Bruto",
+      value: formatCents(grossIncomeCents),
+      description: isRealized
+        ? "Receitas efetivamente pagas no período"
+        : "Atendimentos confirmados futuros e outras receitas previstas",
     },
     {
-      label: "Recebido",
-      value: formatCents(receivedIncomeCents),
-      description: "Pagamentos confirmados no período",
+      label: "Custos de Serviços",
+      value: formatCents(serviceCostCents),
+      description: isRealized
+        ? "Custos de material registrados em atendimentos concluídos"
+        : "Materiais estimados para atendimentos confirmados",
     },
     {
-      label: "Despesas previstas",
-      value: formatCents(expectedExpenseCents),
-      description: `Pagas no período: ${formatCents(paidExpenseCents)}`,
+      label: "Despesas Fixas",
+      value: formatCents(fixedExpenseCents),
+      description: isRealized
+        ? "Despesas não vinculadas a atendimentos, efetivamente pagas"
+        : "Despesas não vinculadas a atendimentos, ainda previstas",
     },
     {
-      label: "Lucro estimado",
-      value: formatCents(estimatedProfitCents),
-      description: "Receitas previstas menos despesas previstas",
+      label: "Lucro Líquido",
+      value: formatCents(netProfitCents),
+      description: isRealized
+        ? "Faturamento recebido menos custos e despesas pagas"
+        : "Faturamento previsto menos custos e despesas estimados",
     },
   ];
 
@@ -169,6 +221,11 @@ export default async function FinancePage({
         action="/dashboard/finance"
         className="mt-6 flex flex-wrap items-end gap-3 rounded-2xl border border-vitta-border bg-white p-4 shadow-card"
       >
+        <input
+          name="view"
+          type="hidden"
+          value={isRealized ? "realized" : "forecast"}
+        />
         <label className="text-sm font-medium text-vitta-text">
           De
           <input
@@ -205,6 +262,33 @@ export default async function FinancePage({
       {period.error && (
         <p className="mt-3 text-sm text-amber-800">{period.error}</p>
       )}
+
+      <nav
+        aria-label="Tipo de valores financeiros"
+        className="mt-5 inline-flex rounded-xl border border-vitta-border bg-white p-1 shadow-card"
+      >
+        {[
+          { value: "forecast", label: "Valores Previstos" },
+          { value: "realized", label: "Valores Realizados" },
+        ].map((tab) => (
+          <Link
+            aria-current={
+              (isRealized ? tab.value === "realized" : tab.value === "forecast")
+                ? "page"
+                : undefined
+            }
+            className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+              (isRealized ? tab.value === "realized" : tab.value === "forecast")
+                ? "bg-vitta text-white"
+                : "text-vitta-muted hover:bg-vitta-background"
+            }`}
+            href={`/dashboard/finance?from=${encodeURIComponent(period.fromDate)}&to=${encodeURIComponent(period.toDate)}&view=${tab.value}`}
+            key={tab.value}
+          >
+            {tab.label}
+          </Link>
+        ))}
+      </nav>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((card) => (

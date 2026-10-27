@@ -10,6 +10,7 @@ export type ServiceFormValues = {
   name?: string;
   description?: string | null;
   price?: string;
+  materialCost?: string;
   durationMinutes?: number;
   onlineBookingEnabled?: boolean;
   isActive?: boolean;
@@ -82,6 +83,27 @@ export function ServiceForm({
           />
         </label>
       </div>
+      <label className="block text-sm font-medium text-vitta-text">
+        <span className="flex items-center gap-2">
+          Custo de Material (R$)
+          <span
+            aria-label="Estimativa de gastos com produtos, descartáveis e insumos para cada sessão. Deixe 0 se não houver custo direto."
+            className="inline-flex h-5 w-5 cursor-help items-center justify-center rounded-full border border-vitta-border text-xs font-semibold text-vitta-muted"
+            title="Estimativa de gastos com produtos, descartáveis e insumos para cada sessão. Deixe 0 se não houver custo direto."
+          >
+            ?
+          </span>
+        </span>
+        <input
+          className="mt-1.5 w-full rounded-xl border border-vitta-border px-3 py-2.5 outline-none focus:border-vitta focus:ring-2 focus:ring-vitta/15"
+          min="0"
+          name="materialCost"
+          required
+          step="0.01"
+          type="number"
+          defaultValue={service?.materialCost ?? "0"}
+        />
+      </label>
       <label className="flex items-start gap-3 text-sm text-vitta-text">
         <input
           className="mt-1 accent-vitta"

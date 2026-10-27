@@ -77,8 +77,9 @@ apagar os valores existentes nela.
 - Clientes: cadastro, edição, busca por nome/WhatsApp e histórico recente de
   atendimentos, sem coleta de data de nascimento. A exclusão é impedida quando
   há histórico, preservando os registros associados.
-- Serviços: cadastro e edição de nome, descrição, preço, duração e permissão
-  para agendamento online. A desativação é reversível e preserva o histórico.
+- Serviços: cadastro e edição de nome, descrição, preço, custo estimado de
+  material, duração e permissão para agendamento online. A desativação é
+  reversível e preserva o histórico.
 - Agenda: visualização diária, semanal e mensal; criação manual de
   atendimentos, cancelamento e conclusão; bloqueios de horários; e configuração
   de expediente por dia da semana.
@@ -88,9 +89,11 @@ apagar os valores existentes nela.
 - Operações da agenda verificam a propriedade dos registros no servidor e
   usam transações serializáveis para evitar conflitos concorrentes.
 - **Minha Conta** permite revisar dados profissionais, editar nome/e-mail/
-  telefone/especialidade e alterar senha após confirmar a senha atual. O CPF
-  fica somente para leitura; alterações de senha são verificadas no servidor
-  e armazenadas com hash bcrypt.
+  telefone/especialidade, alterar senha após confirmar a senha atual e enviar
+  uma foto de perfil comprimida no navegador para WebP 256x256. A imagem é
+  validada no servidor e limitada a 50 KB antes de ser armazenada. O CPF fica
+  somente para leitura; alterações de senha são verificadas no servidor e
+  armazenadas com hash bcrypt.
 
 ## Agendamento público
 
@@ -110,12 +113,18 @@ apagar os valores existentes nela.
 - Atendimentos manuais e solicitações públicas criam uma receita prevista
   vinculada ao agendamento. Ao cancelar um atendimento, a receita pendente
   correspondente é cancelada; pagamentos já realizados permanecem registrados.
+- Ao concluir um atendimento, o custo atual do material é copiado para o
+  agendamento e são registrados automaticamente a receita recebida e o custo
+  operacional pago, ambos vinculados ao atendimento. A restrição por
+  atendimento e tipo evita lançamentos duplicados.
 - O financeiro permite registrar receitas e despesas independentes, informar
   valor, categoria, data prevista e marcar um lançamento como já pago/recebido.
-  Valores pendentes e efetivamente pagos são apresentados separadamente.
-- A estimativa de lucro corresponde às receitas previstas menos as despesas
-  previstas no período selecionado. O relatório também exibe faturamento
-  recebido, despesas pagas e lucro realizado.
+  O painel alterna entre valores previstos (atendimentos futuros confirmados,
+  custos de material estimados e despesas pendentes) e realizados (transações
+  pagas), apresentando faturamento bruto, custos de serviços, despesas fixas e
+  lucro líquido.
+- Os relatórios consideram custos de materiais dos atendimentos confirmados
+  nas despesas previstas, além dos custos já registrados ao concluir sessões.
 - Atalhos da agenda criam mensagens de WhatsApp para solicitações recebidas,
   confirmações, lembretes e agradecimentos, conforme o estado do atendimento.
   A confirmação de um horário solicitado também pode ser registrada na agenda.

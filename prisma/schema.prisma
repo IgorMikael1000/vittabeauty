@@ -33,6 +33,7 @@ model Professional {
   cpf          String?       @unique
   phone        String?
   specialty    String?
+  logoUrl      String?       @db.Text
   passwordHash String
   slug         String        @unique
   timezone     String        @default("America/Sao_Paulo")
@@ -72,6 +73,7 @@ model Service {
   name                String
   description         String?
   price               Decimal       @db.Decimal(10, 2)
+  materialCost        Decimal       @db.Decimal(10, 2) @default(0)
   durationMinutes     Int
   onlineBookingEnabled Boolean     @default(true)
   isActive            Boolean       @default(true)
@@ -94,6 +96,7 @@ model Appointment {
   endsAt         DateTime
   status         AppointmentStatus @default(PENDING)
   priceAtBooking Decimal           @db.Decimal(10, 2)
+  materialCost   Decimal           @db.Decimal(10, 2) @default(0)
   notes          String?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
@@ -134,7 +137,7 @@ model CalendarBlock {
 model Transaction {
   id             String            @id @default(cuid())
   professionalId String
-  appointmentId  String?           @unique
+  appointmentId  String?
   type           TransactionType
   status         TransactionStatus @default(PENDING)
   amount         Decimal           @db.Decimal(10, 2)
@@ -147,6 +150,7 @@ model Transaction {
   professional   Professional      @relation(fields: [professionalId], references: [id], onDelete: Cascade)
   appointment    Appointment?      @relation(fields: [appointmentId, professionalId], references: [id, professionalId], onDelete: Restrict)
 
+  @@unique([appointmentId, type])
   @@index([professionalId, type, status])
   @@index([professionalId, dueAt])
 }

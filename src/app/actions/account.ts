@@ -89,6 +89,45 @@ export async function updateProfessionalDetailsAction(
   return { success: "Seus dados foram atualizados." };
 }
 
+export async function updateProfileImageAction(
+  logoUrl: string,
+): Promise<FormState> {
+  const professionalId = await getAuthenticatedProfessionalId();
+
+  if (
+    typeof logoUrl !== "string" ||
+    new TextEncoder().encode(logoUrl).byteLength > 50 * 1024
+  ) {
+    return { error: "A imagem deve ter no máximo 50 KB." };
+  }
+
+  const imageMatch = /^data:image\/webp;base64,([A-Za-z0-9+/]+={0,2})$/.exec(
+    logoUrl,
+  );
+
+  if (!imageMatch) {
+    return { error: "Envie uma imagem WebP válida." };
+  }
+
+  const imageBytes = Buffer.from(imageMatch[1], "base64");
+  if (
+    imageBytes.length < 12 ||
+    imageBytes.toString("base64") !== imageMatch[1] ||
+    imageBytes.toString("ascii", 0, 4) !== "RIFF" ||
+    imageBytes.toString("ascii", 8, 12) !== "WEBP"
+  ) {
+    return { error: "Envie uma imagem WebP válida." };
+  }
+
+  await getPrismaClient().professional.update({
+    where: { id: professionalId },
+    data: { logoUrl },
+  });
+
+  revalidatePath("/dashboard/conta");
+  return { success: "Foto de perfil atualizada." };
+}
+
 export async function verifyCurrentPasswordAction(
   _previousState: FormState,
   formData: FormData,

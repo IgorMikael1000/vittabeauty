@@ -3,6 +3,8 @@
 import {
   AppointmentStatus,
   Prisma,
+  TransactionStatus,
+  TransactionType,
 } from "@/generated/prisma/client";
 import { revalidatePath } from "next/cache";
 import { getAuthenticatedProfessionalId } from "@/lib/authenticated-professional";
@@ -372,7 +374,14 @@ export async function updateAppointmentStatusAction(
   const prisma = getPrismaClient();
   const appointment = await prisma.appointment.findFirst({
     where: { id: appointmentId, professionalId },
-    select: { id: true, startsAt: true, status: true },
+    select: {
+      id: true,
+      startsAt: true,
+      status: true,
+      priceAtBooking: true,
+      service: { select: { name: true, materialCost: true } },
+      client: { select: { name: true } },
+    },
   });
 
   if (!appointment) {
@@ -411,7 +420,13 @@ export async function updateAppointmentStatusAction(
             ? AppointmentStatus.PENDING
             : { in: activeAppointmentStatuses },
       },
-      data: { status: nextStatus },
+      data:
+        intent === "complete"
+          ? {
+              status: nextStatus,
+              materialCost: appointment.service.materialCost,
+            }
+          : { status: nextStatus },
     });
 
     if (updated.count !== 1) {
@@ -427,6 +442,59 @@ export async function updateAppointmentStatusAction(
           status: "PENDING",
         },
         data: { status: "CANCELLED" },
+      });
+    }
+
+    if (intent === "complete") {
+      const description = `${appointment.service.name} · ${appointment.client.name}`;
+      const paidAt = new Date();
+      await transaction.transaction.upsert({
+        where: {
+          appointmentId_type: {
+            appointmentId: appointment.id,
+            type: TransactionType.INCOME,
+          },
+        },
+        create: {
+          professionalId,
+          appointmentId: appointment.id,
+          type: TransactionType.INCOME,
+          status: TransactionStatus.PAID,
+          amount: appointment.priceAtBooking,
+          description,
+          category: "Atendimento",
+          dueAt: appointment.startsAt,
+          paidAt,
+        },
+        update: {
+          status: TransactionStatus.PAID,
+          amount: appointment.priceAtBooking,
+          paidAt,
+        },
+      });
+      await transaction.transaction.upsert({
+        where: {
+          appointmentId_type: {
+            appointmentId: appointment.id,
+            type: TransactionType.EXPENSE,
+          },
+        },
+        create: {
+          professionalId,
+          appointmentId: appointment.id,
+          type: TransactionType.EXPENSE,
+          status: TransactionStatus.PAID,
+          amount: appointment.service.materialCost,
+          description: `Materiais · ${description}`,
+          category: "Custo Operacional",
+          dueAt: appointment.startsAt,
+          paidAt,
+        },
+        update: {
+          status: TransactionStatus.PAID,
+          amount: appointment.service.materialCost,
+          paidAt,
+        },
       });
     }
 

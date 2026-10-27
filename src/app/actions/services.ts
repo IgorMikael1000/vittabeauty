@@ -13,6 +13,7 @@ export async function saveServiceAction(
   const name = formData.get("name");
   const description = formData.get("description");
   const price = formData.get("price");
+  const materialCost = formData.get("materialCost");
   const durationMinutes = formData.get("durationMinutes");
   const serviceId = formData.get("serviceId");
 
@@ -20,6 +21,7 @@ export async function saveServiceAction(
     typeof name !== "string" ||
     (description !== null && typeof description !== "string") ||
     typeof price !== "string" ||
+    typeof materialCost !== "string" ||
     typeof durationMinutes !== "string" ||
     (serviceId !== null && typeof serviceId !== "string")
   ) {
@@ -30,6 +32,7 @@ export async function saveServiceAction(
   const normalizedDescription = description?.trim() || null;
   const pricePattern = /^(?:\d{1,7})(?:[.,]\d{1,2})?$/;
   const normalizedPrice = price.replace(",", ".");
+  const normalizedMaterialCost = materialCost.replace(",", ".");
   const parsedDuration = Number(durationMinutes);
   const isUpdate = typeof serviceId === "string" && Boolean(serviceId.trim());
 
@@ -39,6 +42,16 @@ export async function saveServiceAction(
 
   if (!pricePattern.test(price) || Number(normalizedPrice) <= 0) {
     return { error: "Informe um preço maior que zero, com até duas casas decimais." };
+  }
+
+  if (
+    !/^(?:\d{1,8})(?:[.,]\d{1,2})?$/.test(materialCost) ||
+    !Number.isFinite(Number(normalizedMaterialCost)) ||
+    Number(normalizedMaterialCost) > 99_999_999.99
+  ) {
+    return {
+      error: "Informe um custo de material válido, igual ou maior que zero e com até duas casas decimais.",
+    };
   }
 
   if (
@@ -57,6 +70,7 @@ export async function saveServiceAction(
     name: normalizedName,
     description: normalizedDescription,
     price: normalizedPrice,
+    materialCost: normalizedMaterialCost,
     durationMinutes: parsedDuration,
     onlineBookingEnabled: formData.get("onlineBookingEnabled") === "on",
     isActive: isUpdate ? formData.get("isActive") === "on" : true,

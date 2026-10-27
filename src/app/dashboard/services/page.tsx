@@ -82,6 +82,9 @@ export default async function ServicesPage() {
                     <p className="mt-1 text-xs text-vitta-muted">
                       {service.durationMinutes} minutos
                     </p>
+                    <p className="mt-1 text-xs text-vitta-muted">
+                      Material: {currency.format(Number(service.materialCost))}
+                    </p>
                   </div>
                 </div>
                 <p className="mt-3 text-xs text-vitta-muted">
@@ -100,6 +103,7 @@ export default async function ServicesPage() {
                         name: service.name,
                         description: service.description,
                         price: service.price.toString(),
+                        materialCost: service.materialCost.toString(),
                         durationMinutes: service.durationMinutes,
                         onlineBookingEnabled: service.onlineBookingEnabled,
                         isActive: service.isActive,

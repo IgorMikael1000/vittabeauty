@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ProfileImageUpload } from "@/components/account/profile-image-upload";
 import { getAuthenticatedProfessionalId } from "@/lib/authenticated-professional";
 import { getPrismaClient } from "@/lib/prisma";
 
@@ -31,14 +32,8 @@ export default async function AccountPage() {
   const professionalId = await getAuthenticatedProfessionalId();
   const professional = await getPrismaClient().professional.findUniqueOrThrow({
     where: { id: professionalId },
-    select: { name: true, specialty: true },
+    select: { name: true, specialty: true, logoUrl: true },
   });
-  const initials = professional.name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0]?.toLocaleUpperCase("pt-BR"))
-    .join("");
 
   return (
     <section className="mx-auto w-full max-w-4xl">
@@ -53,13 +48,10 @@ export default async function AccountPage() {
         <div className="h-28 bg-gradient-to-r from-[#63417c] via-[#7950a5] to-[#b47eb8]" />
         <div className="px-6 pb-7 sm:px-9">
           <div className="-mt-12 flex flex-col items-center text-center">
-            <div
-              aria-label={`Foto de perfil de ${professional.name}`}
-              className="flex h-24 w-24 items-center justify-center rounded-full border-4 border-white bg-gradient-to-br from-[#eedbee] to-[#f7e7ef] text-2xl font-semibold tracking-tight text-[#714992] shadow-[0_8px_24px_rgba(66,47,78,0.12)]"
-              role="img"
-            >
-              {initials || "VB"}
-            </div>
+            <ProfileImageUpload
+              logoUrl={professional.logoUrl}
+              name={professional.name}
+            />
             <h2 className="mt-3 text-xl font-semibold tracking-[-0.03em] text-vitta-text">
               {professional.name}
             </h2>
