@@ -10,6 +10,40 @@ import {
 import { getAuthenticatedProfessionalId } from "@/lib/authenticated-professional";
 import { getPrismaClient } from "@/lib/prisma";
 
+function serializeErrorDetails(error: unknown): string {
+  const seen = new WeakSet<object>();
+
+  return (
+    JSON.stringify(
+      { error },
+      (_key, value: unknown) => {
+        if (typeof value === "bigint") {
+          return value.toString();
+        }
+
+        if (typeof value === "object" && value !== null) {
+          if (seen.has(value)) {
+            return "[Circular]";
+          }
+          seen.add(value);
+
+          if (value instanceof Error) {
+            return Object.fromEntries(
+              Object.getOwnPropertyNames(value).map((property) => [
+                property,
+                Reflect.get(value, property),
+              ]),
+            );
+          }
+        }
+
+        return value;
+      },
+      2,
+    ) ?? String(error)
+  );
+}
+
 function getApplicationUrl(): string {
   const configuredUrl =
     process.env.NEXT_PUBLIC_APP_URL ??
@@ -99,8 +133,8 @@ export async function createSubscriptionCheckoutAction(
     subscriptionId = subscription.id;
   } catch (error) {
     console.error(
-      "Mercado Pago checkout creation failed.",
-      error instanceof Error ? error.name : "Unknown Mercado Pago error",
+      "[Mercado Pago] Falha detalhada ao criar assinatura:",
+      serializeErrorDetails(error),
     );
     return {
       error: "Não foi possível iniciar o checkout. Tente novamente em instantes.",

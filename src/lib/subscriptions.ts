@@ -10,12 +10,12 @@ export const subscriptionPlans = {
   },
   SEMIANNUAL: {
     name: "Semestral",
-    amount: 109.9,
+    amount: 99.5,
     frequency: 6,
     durationDays: 180,
-    priceLabel: "R$ 109,90",
+    priceLabel: "R$ 99,50",
     intervalLabel: "a cada 6 meses",
-    savings: "Economize R$ 9,50",
+    savings: "Ganhe 1 mês · economize R$ 19,90",
   },
   ANNUAL: {
     name: "Anual",
@@ -24,7 +24,7 @@ export const subscriptionPlans = {
     durationDays: 365,
     priceLabel: "R$ 209,90",
     intervalLabel: "por ano",
-    savings: "Melhor Custo Benefício · economize R$ 28,90",
+    savings: "Melhor Custo Benefício · economize R$ 28,90 e ganhe 45 dias",
   },
 } as const;
 
