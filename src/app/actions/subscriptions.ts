@@ -90,7 +90,7 @@ export async function createSubscriptionCheckoutAction(
   const plan = subscriptionPlans[planTypeValue];
   const professional = await getPrismaClient().professional.findUnique({
     where: { id: professionalId },
-    select: { email: true, expiresAt: true },
+    select: { email: true },
   });
 
   if (!professional) {
@@ -114,11 +114,7 @@ export async function createSubscriptionCheckoutAction(
         frequency_type: "months",
         transaction_amount: plan.amount,
         currency_id: "BRL",
-        start_date: new Date(
-          Math.max(professional.expiresAt.getTime(), Date.now()),
-        ).toISOString(),
       },
-      status: "pending",
     } satisfies Parameters<PreApproval["create"]>[0]["body"];
     console.log("Payload enviado ao MP:", JSON.stringify(body, null, 2));
     const subscription = await preApproval.create({
