@@ -52,6 +52,31 @@ export function formatBrazilianPhone(value: string): string {
   return `(${areaCode}) ${subscriber.slice(0, prefixLength)}-${subscriber.slice(prefixLength)}`;
 }
 
+export function formatAccountPhone(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+
+  if (digits.length <= 2) {
+    return digits.length ? `(${digits}` : "";
+  }
+
+  const areaCode = digits.slice(0, 2);
+  const subscriber = digits.slice(2);
+
+  if (digits.length > 10) {
+    if (subscriber.length <= 1) {
+      return `(${areaCode}) ${subscriber}`;
+    }
+
+    return `(${areaCode}) ${subscriber[0]} ${subscriber.slice(1, 5)}${
+      subscriber.length > 5 ? `-${subscriber.slice(5)}` : ""
+    }`;
+  }
+
+  return `(${areaCode}) ${subscriber.slice(0, 4)}${
+    subscriber.length > 4 ? `-${subscriber.slice(4)}` : ""
+  }`;
+}
+
 export function getPasswordRequirements(password: string) {
   return [
     { label: "Pelo menos 8 caracteres", met: [...password].length >= 8 },

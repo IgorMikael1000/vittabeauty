@@ -15,7 +15,6 @@ export default async function LoginPage({
   return (
     <AuthForm
       initialEmail={email}
-      mode="login"
       registered={registered === "1"}
     />
   );

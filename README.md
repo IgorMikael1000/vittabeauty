@@ -62,7 +62,9 @@ apagar os valores existentes nela.
 - O Auth.js usa credenciais e sessões JWT em cookies seguros; senhas são
   armazenadas com hash bcrypt.
 - O cadastro exige nome e sobrenome, CPF validado, telefone, especialidade e
-  senha com requisitos de segurança; CPF é armazenado sem máscara e único.
+  senha com requisitos de segurança em duas etapas; o nome pode ser o nome
+  profissional, do negócio ou uma combinação (por exemplo, "Ana HairStudio").
+  CPF é armazenado sem máscara e único.
 - Cada profissional recebe um slug exclusivo no cadastro.
 - Client, Service, Appointment e Transaction possuem `professionalId`.
 - Relações entre agendamentos, clientes, serviços e transações usam chaves
@@ -85,6 +87,10 @@ apagar os valores existentes nela.
   período sem conflito com outros atendimentos ou bloqueios.
 - Operações da agenda verificam a propriedade dos registros no servidor e
   usam transações serializáveis para evitar conflitos concorrentes.
+- **Minha Conta** permite revisar dados profissionais, editar nome/e-mail/
+  telefone/especialidade e alterar senha após confirmar a senha atual. O CPF
+  fica somente para leitura; alterações de senha são verificadas no servidor
+  e armazenadas com hash bcrypt.
 
 ## Agendamento público
 

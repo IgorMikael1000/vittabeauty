@@ -18,7 +18,7 @@ export default async function DashboardLayout({
 
   const professional = await getPrismaClient().professional.findUniqueOrThrow({
     where: { id: session.user.id },
-    select: { specialty: true },
+    select: { name: true, specialty: true },
   });
 
   return (
@@ -59,7 +59,7 @@ export default async function DashboardLayout({
               Espaço profissional
             </p>
             <p className="mt-0.5 truncate text-[13px] font-semibold tracking-[-0.01em] text-vitta-text">
-              {session.user.name}
+              {professional.name}
             </p>
             <p className="truncate text-[11px] font-medium text-vitta-muted">
               {professional.specialty ?? "Profissional da beleza"}
@@ -68,7 +68,7 @@ export default async function DashboardLayout({
           <div className="flex items-center gap-3">
             <span aria-hidden="true" className="hidden h-8 w-px bg-[#e9e1ed] sm:block" />
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#eedbee] to-[#f7e7ef] text-xs font-semibold text-[#714992]">
-              {session.user.name?.slice(0, 1).toUpperCase() ?? "V"}
+              {professional.name.slice(0, 1).toUpperCase()}
             </span>
             <form action={logoutAction}>
               <button

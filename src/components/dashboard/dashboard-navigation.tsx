@@ -11,6 +11,7 @@ const items = [
   { href: "/dashboard/finance", label: "Financeiro", icon: "finance" },
   { href: "/dashboard/reports", label: "Relatórios", icon: "reports" },
   { href: "/dashboard/booking-link", label: "Meu link", icon: "link" },
+  { href: "/dashboard/conta", label: "Minha Conta", icon: "profile" },
 ] as const;
 
 const iconPaths = {
@@ -21,6 +22,7 @@ const iconPaths = {
   finance: "M4 5h16v14H4zM8 15l3-3 2 2 4-5M8 9h.01",
   reports: "M4 19V5m0 14h17M8 16v-4m5 4V8m5 8v-6",
   link: "M10 13a5 5 0 0 0 7.07 0l3-3A5 5 0 0 0 13 2.93l-1.72 1.71m2.72 6.36a5 5 0 0 0-7.07 0l-3 3A5 5 0 0 0 11 21.07l1.71-1.71",
+  profile: "M20 21a8 8 0 0 0-16 0m8-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z",
 } as const;
 
 export function DashboardNavigation() {
