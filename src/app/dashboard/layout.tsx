@@ -18,14 +18,18 @@ export default async function DashboardLayout({
   return (
     <div className="flex flex-1 flex-col md:flex-row">
       <aside className="min-w-0 border-b border-[#e9e1ed]/80 bg-white/70 px-4 pb-2 pt-5 backdrop-blur-xl md:sticky md:top-0 md:h-screen md:w-[258px] md:shrink-0 md:border-b-0 md:border-r md:px-5 md:pb-6 md:pt-8">
-        <Link className="flex w-fit items-center px-1" href="/dashboard">
+        <Link
+          aria-label="Vitta Beauty — início"
+          className="relative block h-[118px] w-[220px] max-w-full overflow-hidden"
+          href="/dashboard"
+        >
           <Image
             alt="Vitta Beauty"
-            className="h-[58px] w-[150px] object-contain object-left md:h-[68px] md:w-[176px]"
-            height={360}
+            className="absolute left-1/2 top-1/2 h-[212px] w-[318px] max-w-none -translate-x-1/2 -translate-y-[40%]"
+            height={408}
             priority
             src="/brand/logo_vitta.png"
-            width={640}
+            width={612}
           />
         </Link>
         <DashboardNavigation />

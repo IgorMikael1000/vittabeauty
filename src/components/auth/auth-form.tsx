@@ -24,14 +24,16 @@ export function AuthForm({ mode, registered = false }: AuthFormProps) {
   return (
     <section className="w-full max-w-md rounded-[28px] border border-white/80 bg-white/90 p-7 shadow-[0_24px_70px_rgba(66,47,78,0.12)] backdrop-blur-xl sm:p-9">
       <div className="mb-8">
-        <Image
-          alt="Vitta Beauty"
-          className="mb-5 h-[76px] w-[172px] object-contain object-left"
-          height={360}
-          priority
-          src="/brand/logo_vitta.png"
-          width={640}
-        />
+        <div className="relative mb-3 h-[160px] w-[300px] max-w-full overflow-hidden">
+          <Image
+            alt="Vitta Beauty"
+            className="absolute left-1/2 top-1/2 h-[267px] w-[400px] max-w-none -translate-x-1/2 -translate-y-[40%]"
+            height={408}
+            priority
+            src="/brand/logo_vitta.png"
+            width={612}
+          />
+        </div>
         <h1 className="text-[28px] font-semibold tracking-[-0.04em] text-vitta-text">
           {isRegister ? "Crie sua conta" : "Bem-vinda de volta"}
         </h1>
