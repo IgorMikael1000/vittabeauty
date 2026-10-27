@@ -212,17 +212,23 @@ export async function createPublicBookingAction(
 
         const existingClients = await transaction.client.findMany({
           where: { professionalId: professional.id },
-          select: { id: true, whatsapp: true },
+          select: { id: true, name: true, whatsapp: true },
         });
-        const existingClient = existingClients.find(
+        const existingClientByWhatsapp = existingClients.find(
           (client) => client.whatsapp.replace(/\D/g, "") === whatsapp,
         );
+        const normalizedName = name.toLocaleLowerCase("pt-BR").replace(/\s+/g, " ");
+        const existingClientByName = existingClients.find(
+          (client) =>
+            client.name
+              .trim()
+              .toLocaleLowerCase("pt-BR")
+              .replace(/\s+/g, " ") === normalizedName,
+        );
+        const existingClient =
+          existingClientByWhatsapp ?? existingClientByName;
         const client = existingClient
-          ? await transaction.client.update({
-              where: { id: existingClient.id },
-              data: { name, whatsapp },
-              select: { id: true, name: true },
-            })
+          ? { id: existingClient.id, name: existingClient.name }
           : await transaction.client.create({
               data: {
                 professionalId: professional.id,
