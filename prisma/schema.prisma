@@ -38,6 +38,7 @@ model Professional {
   subscriptionStatus   String                @default("TRIAL")
   planType             String                @default("FREE")
   expiresAt            DateTime              @default(dbgenerated("(CURRENT_TIMESTAMP + INTERVAL '3 days')"))
+  hasSeenWelcome       Boolean               @default(false)
   mpSubscriptionId     String?
   passwordHash         String
   slug                 String                @unique

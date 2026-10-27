@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { logoutAction } from "@/app/actions/auth";
 import { auth } from "@/auth";
 import { DashboardNavigation } from "@/components/dashboard/dashboard-navigation";
+import { WelcomeTour } from "@/components/onboarding/welcome-tour";
 import { PlanCards } from "@/components/subscription/plan-cards";
 import { getPrismaClient } from "@/lib/prisma";
 
@@ -27,6 +28,7 @@ export default async function DashboardLayout({
       expiresAt: true,
       subscriptionStatus: true,
       planType: true,
+      hasSeenWelcome: true,
     },
   });
   if (!professional) {
@@ -48,6 +50,11 @@ export default async function DashboardLayout({
   }
 
   const expirationLabel = new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "long",
+    timeStyle: "short",
+    timeZone: "America/Sao_Paulo",
+  }).format(professional.expiresAt);
+  const trialEndsAt = new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "long",
     timeStyle: "short",
     timeZone: "America/Sao_Paulo",
@@ -171,6 +178,9 @@ export default async function DashboardLayout({
             </form>
           </section>
         </div>
+      )}
+      {!professional.hasSeenWelcome && (
+        <WelcomeTour trialEndsAt={trialEndsAt} />
       )}
     </>
   );
