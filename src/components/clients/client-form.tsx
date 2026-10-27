@@ -9,7 +9,6 @@ type ClientFormValues = {
   id?: string;
   name?: string;
   whatsapp?: string;
-  birthday?: Date | null;
   preferredServiceId?: string | null;
   notes?: string | null;
 };
@@ -31,8 +30,6 @@ export function ClientForm({
     saveClientAction,
     initialState,
   );
-  const birthday = client?.birthday?.toISOString().slice(0, 10);
-
   return (
     <form action={formAction} className="space-y-4">
       {client?.id && (
@@ -65,15 +62,6 @@ export function ClientForm({
           required
           type="tel"
           defaultValue={client?.whatsapp ?? ""}
-        />
-      </label>
-      <label className="block text-sm font-medium text-vitta-text">
-        Aniversário
-        <input
-          className="mt-1.5 w-full rounded-xl border border-vitta-border px-3 py-2.5 outline-none focus:border-vitta focus:ring-2 focus:ring-vitta/15"
-          name="birthday"
-          type="date"
-          defaultValue={birthday ?? ""}
         />
       </label>
       <label className="block text-sm font-medium text-vitta-text">

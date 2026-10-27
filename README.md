@@ -52,10 +52,17 @@ I&T Solutions com Next.js, TypeScript, Tailwind CSS, Prisma e PostgreSQL na Neon
 - `npm run db:push`: sincroniza o schema com o banco configurado.
 - `npm run db:migrate`: cria e aplica uma migration de desenvolvimento.
 
+O schema atual adiciona CPF, telefone e especialidade para profissionais e
+remove a data de nascimento de clientes. Antes de sincronizar um banco que já
+tenha dados, faça backup: o `db:push` pode remover a coluna de aniversário e
+apagar os valores existentes nela.
+
 ## Fundação e segurança
 
 - O Auth.js usa credenciais e sessões JWT em cookies seguros; senhas são
   armazenadas com hash bcrypt.
+- O cadastro exige nome e sobrenome, CPF validado, telefone, especialidade e
+  senha com requisitos de segurança; CPF é armazenado sem máscara e único.
 - Cada profissional recebe um slug exclusivo no cadastro.
 - Client, Service, Appointment e Transaction possuem `professionalId`.
 - Relações entre agendamentos, clientes, serviços e transações usam chaves
@@ -66,8 +73,8 @@ I&T Solutions com Next.js, TypeScript, Tailwind CSS, Prisma e PostgreSQL na Neon
 ## Gestão interna
 
 - Clientes: cadastro, edição, busca por nome/WhatsApp e histórico recente de
-  atendimentos. A exclusão é impedida quando há histórico, preservando os
-  registros associados.
+  atendimentos, sem coleta de data de nascimento. A exclusão é impedida quando
+  há histórico, preservando os registros associados.
 - Serviços: cadastro e edição de nome, descrição, preço, duração e permissão
   para agendamento online. A desativação é reversível e preserva o histórico.
 - Agenda: visualização diária, semanal e mensal; criação manual de

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { logoutAction } from "@/app/actions/auth";
 import { auth } from "@/auth";
 import { DashboardNavigation } from "@/components/dashboard/dashboard-navigation";
+import { getPrismaClient } from "@/lib/prisma";
 
 export default async function DashboardLayout({
   children,
@@ -14,6 +15,11 @@ export default async function DashboardLayout({
   if (!session?.user?.id) {
     redirect("/login");
   }
+
+  const professional = await getPrismaClient().professional.findUniqueOrThrow({
+    where: { id: session.user.id },
+    select: { specialty: true },
+  });
 
   return (
     <div className="flex flex-1 flex-col md:flex-row">
@@ -54,9 +60,9 @@ export default async function DashboardLayout({
             </p>
             <p className="mt-0.5 truncate text-[13px] font-semibold tracking-[-0.01em] text-vitta-text">
               {session.user.name}
-              <span className="hidden font-normal text-vitta-muted sm:inline">
-                {" "}· {session.user.email}
-              </span>
+            </p>
+            <p className="truncate text-[11px] font-medium text-vitta-muted">
+              {professional.specialty ?? "Profissional da beleza"}
             </p>
           </div>
           <div className="flex items-center gap-3">

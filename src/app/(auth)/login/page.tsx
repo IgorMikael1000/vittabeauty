@@ -8,9 +8,15 @@ export const metadata: Metadata = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ registered?: string }>;
+  searchParams: Promise<{ registered?: string; email?: string }>;
 }) {
-  const { registered } = await searchParams;
+  const { registered, email } = await searchParams;
 
-  return <AuthForm mode="login" registered={registered === "1"} />;
+  return (
+    <AuthForm
+      initialEmail={email}
+      mode="login"
+      registered={registered === "1"}
+    />
+  );
 }

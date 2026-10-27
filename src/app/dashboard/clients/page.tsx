@@ -148,19 +148,6 @@ export default async function ClientsPage({
                   <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
                     <div>
                       <dt className="text-xs font-medium uppercase tracking-wide text-vitta-muted">
-                        Aniversário
-                      </dt>
-                      <dd className="mt-1 text-vitta-text">
-                        {client.birthday
-                          ? new Intl.DateTimeFormat("pt-BR", {
-                              timeZone: "UTC",
-                              dateStyle: "long",
-                            }).format(client.birthday)
-                          : "Não informado"}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs font-medium uppercase tracking-wide text-vitta-muted">
                         Serviço preferido
                       </dt>
                       <dd className="mt-1 text-vitta-text">

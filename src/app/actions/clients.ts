@@ -9,14 +9,12 @@ import type { FormState } from "@/app/actions/auth";
 function readClientFields(formData: FormData) {
   const name = formData.get("name");
   const whatsapp = formData.get("whatsapp");
-  const birthday = formData.get("birthday");
   const preferredServiceId = formData.get("preferredServiceId");
   const notes = formData.get("notes");
 
   if (
     typeof name !== "string" ||
     typeof whatsapp !== "string" ||
-    (birthday !== null && typeof birthday !== "string") ||
     (preferredServiceId !== null && typeof preferredServiceId !== "string") ||
     (notes !== null && typeof notes !== "string")
   ) {
@@ -37,31 +35,14 @@ function readClientFields(formData: FormData) {
     return { error: "Informe um WhatsApp com DDD e até 15 dígitos." } as const;
   }
 
-  if (birthday && !/^\d{4}-\d{2}-\d{2}$/.test(birthday)) {
-    return { error: "Informe uma data de aniversário válida." } as const;
-  }
-
   if ((normalizedNotes?.length ?? 0) > 1000) {
     return { error: "As observações devem ter no máximo 1.000 caracteres." } as const;
-  }
-
-  const birthdayDate = birthday
-    ? new Date(`${birthday}T00:00:00.000Z`)
-    : null;
-
-  if (
-    birthday &&
-    (Number.isNaN(birthdayDate?.getTime()) ||
-      birthdayDate?.toISOString().slice(0, 10) !== birthday)
-  ) {
-    return { error: "Informe uma data de aniversário válida." } as const;
   }
 
   return {
     data: {
       name: normalizedName,
       whatsapp: normalizedWhatsapp,
-      birthday: birthdayDate,
       preferredServiceId: normalizedServiceId,
       notes: normalizedNotes,
     },
