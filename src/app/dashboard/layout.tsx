@@ -29,6 +29,7 @@ export default async function DashboardLayout({
       subscriptionStatus: true,
       planType: true,
       hasSeenWelcome: true,
+      role: true,
     },
   });
   if (!professional) {
@@ -106,6 +107,14 @@ export default async function DashboardLayout({
             </p>
           </div>
           <div className="flex items-center gap-3">
+            {professional.role === "ADMIN" && (
+              <Link
+                className="rounded-full border border-vitta/20 bg-white/80 px-3.5 py-2 text-xs font-semibold text-vitta transition hover:bg-white"
+                href="/admin"
+              >
+                Admin
+              </Link>
+            )}
             <span aria-hidden="true" className="hidden h-8 w-px bg-[#e9e1ed] sm:block" />
             <Link
               aria-label="Abrir Minha Conta"

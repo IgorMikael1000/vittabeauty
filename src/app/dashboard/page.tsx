@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { auth } from "@/auth";
 import { getAuthenticatedProfessionalId } from "@/lib/authenticated-professional";
 import { sumMoneyCents } from "@/lib/money";
 import { getPrismaClient } from "@/lib/prisma";
@@ -57,16 +56,16 @@ const dashboardItems = [
 ] as const;
 
 export default async function DashboardPage() {
-  const session = await auth();
   const professionalId = await getAuthenticatedProfessionalId();
   const prisma = getPrismaClient();
   const professional = await prisma.professional.findUnique({
     where: { id: professionalId },
-    select: { timezone: true },
+    select: { name: true, timezone: true },
   });
   if (!professional) {
     redirect("/login");
   }
+  const firstName = professional.name.trim().split(/\s+/)[0] || "profissional";
   const now = new Date();
   const today = getCalendarRange(undefined, "day", professional.timezone);
   const [nextAppointment, pendingAppointments, completedAppointments, income] =
@@ -182,7 +181,7 @@ export default async function DashboardPage() {
             Seu espaço, seu momento
           </p>
           <h1 className="mt-3 text-[29px] font-semibold leading-[1.12] tracking-[-0.045em] text-white sm:text-[38px]">
-            Olá, {session?.user.name?.split(" ")[0] ?? "profissional"}.
+            Olá, {firstName}.
             <br className="hidden sm:block" /> Que bom ter você por aqui.
           </h1>
           <p className="mt-3 max-w-lg text-sm leading-6 text-white/75 sm:text-[15px]">

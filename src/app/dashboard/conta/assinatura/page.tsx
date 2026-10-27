@@ -5,7 +5,7 @@ import { MercadoPagoConfig, Payment } from "mercadopago";
 import { PlanCards } from "@/components/subscription/plan-cards";
 import { getAuthenticatedProfessionalId } from "@/lib/authenticated-professional";
 import { getPrismaClient } from "@/lib/prisma";
-import { applyApprovedCheckoutPayment } from "@/lib/subscription-payments";
+import { syncCheckoutPayment } from "@/lib/subscription-payments";
 import { subscriptionPlans } from "@/lib/subscriptions";
 
 export const metadata: Metadata = {
@@ -84,9 +84,16 @@ export default async function SubscriptionPage({
                 "Approved Mercado Pago payment has no valid creation date.",
               );
             }
-            const applied = await applyApprovedCheckoutPayment({
+            const applied = await syncCheckoutPayment({
               paymentId: paymentIdValue,
               externalReference: payment.external_reference,
+              status: payment.status,
+              statusDetail: payment.status_detail,
+              amount: payment.transaction_amount,
+              currency: payment.currency_id,
+              paymentMethod: payment.payment_method_id,
+              paymentType: payment.payment_type_id,
+              refundedAmount: payment.transaction_amount_refunded,
               paidAt: new Date(paidAtValue),
               expectedProfessionalId: professionalId,
             });

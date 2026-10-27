@@ -8,7 +8,7 @@ import {
 import { Prisma } from "@/generated/prisma/client";
 import { NextResponse, type NextRequest } from "next/server";
 import { getPrismaClient } from "@/lib/prisma";
-import { applyApprovedCheckoutPayment } from "@/lib/subscription-payments";
+import { syncCheckoutPayment } from "@/lib/subscription-payments";
 import {
   isSubscriptionPlanType,
   subscriptionPlans,
@@ -114,6 +114,7 @@ async function handleAuthorizedPayment(paymentId: string): Promise<void> {
           professionalId: reference.professionalId,
           planType: reference.planType,
           paidAt,
+          appliedAt: paidAt,
         },
       });
 
@@ -155,34 +156,37 @@ async function handlePreferencePayment(paymentId: string): Promise<void> {
   const reference = getPlanReference(payment.external_reference);
   if (!reference) return;
 
-  if (payment.status !== "approved") {
-    if (
-      (payment.status === "rejected" || payment.status === "cancelled") &&
-      payment.status_detail !== "pending_contingency" &&
-      payment.status_detail !== "pending_review_manual"
-    ) {
-      await getPrismaClient().professional.updateMany({
-        where: {
-          id: reference.professionalId,
-          expiresAt: { lte: new Date() },
-        },
-        data: { subscriptionStatus: "EXPIRED" },
-      });
-    }
-    return;
-  }
-
-  const paidAtCandidate = new Date(
-    payment.date_approved ?? payment.date_created ?? Date.now(),
-  );
-  const paidAt = Number.isNaN(paidAtCandidate.getTime())
-    ? new Date()
-    : paidAtCandidate;
-  await applyApprovedCheckoutPayment({
+  const paidAtValue = payment.date_approved ?? payment.date_created;
+  const paidAt =
+    paidAtValue && !Number.isNaN(new Date(paidAtValue).getTime())
+      ? new Date(paidAtValue)
+      : undefined;
+  await syncCheckoutPayment({
     paymentId,
     externalReference: payment.external_reference,
+    status: payment.status ?? "unknown",
+    statusDetail: payment.status_detail,
+    amount: payment.transaction_amount,
+    currency: payment.currency_id,
+    paymentMethod: payment.payment_method_id,
+    paymentType: payment.payment_type_id,
+    refundedAmount: payment.transaction_amount_refunded,
     paidAt,
   });
+
+  if (
+    (payment.status === "rejected" || payment.status === "cancelled") &&
+    payment.status_detail !== "pending_contingency" &&
+    payment.status_detail !== "pending_review_manual"
+  ) {
+    await getPrismaClient().professional.updateMany({
+      where: {
+        id: reference.professionalId,
+        expiresAt: { lte: new Date() },
+      },
+      data: { subscriptionStatus: "EXPIRED" },
+    });
+  }
 }
 
 export async function POST(request: NextRequest) {

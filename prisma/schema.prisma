@@ -26,6 +26,11 @@ enum TransactionStatus {
   CANCELLED
 }
 
+enum ProfessionalRole {
+  PROFESSIONAL
+  ADMIN
+}
+
 model Professional {
   id                   String                @id @default(cuid())
   name                 String
@@ -39,6 +44,7 @@ model Professional {
   planType             String                @default("FREE")
   expiresAt            DateTime              @default(dbgenerated("(CURRENT_TIMESTAMP + INTERVAL '3 days')"))
   hasSeenWelcome       Boolean               @default(false)
+  role                 ProfessionalRole      @default(PROFESSIONAL)
   mpSubscriptionId     String?
   passwordHash         String
   slug                 String                @unique
@@ -170,9 +176,28 @@ model SubscriptionPayment {
   mercadoPagoPaymentId String       @unique
   professionalId       String
   planType             String
-  paidAt               DateTime
+  amount               Decimal?     @db.Decimal(10, 2)
+  currency             String?
+  paymentMethod        String?
+  paymentType          String?
+  status               String       @default("approved")
+  statusDetail         String?
+  refundedAmount       Decimal?     @db.Decimal(10, 2)
+  paidAt               DateTime?
+  appliedAt            DateTime?
   createdAt            DateTime     @default(now())
   professional         Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
 
-  @@index([professionalId, paidAt])
+  @@index([professionalId, status, paidAt])
+  @@index([status, paidAt])
+}
+
+model AdminAuditLog {
+  id                  String   @id @default(cuid())
+  actorProfessionalId String
+  action              String
+  createdAt           DateTime @default(now())
+
+  @@index([actorProfessionalId, createdAt])
+  @@index([action, createdAt])
 }
