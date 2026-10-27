@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { logoutAction } from "@/app/actions/auth";
@@ -17,19 +18,15 @@ export default async function DashboardLayout({
   return (
     <div className="flex flex-1 flex-col md:flex-row">
       <aside className="min-w-0 border-b border-[#e9e1ed]/80 bg-white/70 px-4 pb-2 pt-5 backdrop-blur-xl md:sticky md:top-0 md:h-screen md:w-[258px] md:shrink-0 md:border-b-0 md:border-r md:px-5 md:pb-6 md:pt-8">
-        <Link className="group flex w-fit items-center gap-3 px-1" href="/dashboard">
-          <span className="relative flex h-10 w-10 items-center justify-center rounded-[15px] bg-gradient-to-br from-[#7950a5] to-[#b47eb8] text-lg font-semibold text-white shadow-[0_6px_16px_rgba(121,80,165,0.24)]">
-            V
-            <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-[#e6a4c5]" />
-          </span>
-          <span>
-            <span className="block text-[15px] font-semibold tracking-[-0.035em] text-[#3d2c4d]">
-              Vitta Beauty
-            </span>
-            <span className="mt-0.5 block text-[10px] font-semibold uppercase tracking-[0.16em] text-vitta-muted/80">
-              Seu espaço de cuidado
-            </span>
-          </span>
+        <Link className="flex w-fit items-center px-1" href="/dashboard">
+          <Image
+            alt="Vitta Beauty"
+            className="h-[58px] w-[150px] object-contain object-left md:h-[68px] md:w-[176px]"
+            height={360}
+            priority
+            src="/brand/logo_vitta.png"
+            width={640}
+          />
         </Link>
         <DashboardNavigation />
         <div className="mt-10 hidden rounded-[20px] border border-[#eee5f2] bg-gradient-to-br from-[#fbf8fc] to-[#f4edf8] p-4 md:block">

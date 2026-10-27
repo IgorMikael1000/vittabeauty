@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { PublicBookingForm } from "@/components/booking/public-booking-form";
 import {
@@ -160,9 +161,14 @@ export default async function PublicBookingPage({
     <section className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
       <div className="overflow-hidden rounded-2xl border border-vitta-border bg-white shadow-card">
         <header className="bg-vitta-background px-6 py-8 text-center sm:px-10">
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-vitta">
-            Vitta Beauty
-          </p>
+          <Image
+            alt="Vitta Beauty"
+            className="mx-auto h-[76px] w-[170px] object-contain"
+            height={360}
+            priority
+            src="/brand/logo_vitta.png"
+            width={640}
+          />
           <h1 className="mt-3 text-2xl font-semibold text-vitta-text sm:text-3xl">
             Agende seu horário
           </h1>

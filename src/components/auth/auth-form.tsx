@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useActionState } from "react";
 import {
@@ -23,12 +24,14 @@ export function AuthForm({ mode, registered = false }: AuthFormProps) {
   return (
     <section className="w-full max-w-md rounded-[28px] border border-white/80 bg-white/90 p-7 shadow-[0_24px_70px_rgba(66,47,78,0.12)] backdrop-blur-xl sm:p-9">
       <div className="mb-8">
-        <p className="mb-5 inline-flex items-center gap-2.5 text-[15px] font-semibold tracking-[-0.03em] text-[#49345c]">
-          <span className="flex h-9 w-9 items-center justify-center rounded-[13px] bg-gradient-to-br from-[#7950a5] to-[#b47eb8] text-base text-white shadow-[0_6px_16px_rgba(121,80,165,0.2)]">
-            V
-          </span>
-          Vitta Beauty
-        </p>
+        <Image
+          alt="Vitta Beauty"
+          className="mb-5 h-[76px] w-[172px] object-contain object-left"
+          height={360}
+          priority
+          src="/brand/logo_vitta.png"
+          width={640}
+        />
         <h1 className="text-[28px] font-semibold tracking-[-0.04em] text-vitta-text">
           {isRegister ? "Crie sua conta" : "Bem-vinda de volta"}
         </h1>
