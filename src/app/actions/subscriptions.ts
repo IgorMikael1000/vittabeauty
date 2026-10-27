@@ -1,6 +1,6 @@
 "use server";
 
-import { MercadoPagoConfig, PreApproval } from "mercadopago";
+import { MercadoPagoConfig, Preference } from "mercadopago";
 import {
   isSubscriptionPlanType,
   subscriptionPlans,
@@ -102,35 +102,42 @@ export async function createSubscriptionCheckoutAction(
 
   try {
     const applicationUrl = getApplicationUrl();
-    const preApproval = new PreApproval(
+    const preference = new Preference(
       new MercadoPagoConfig({ accessToken }),
     );
     const body = {
-      reason: `Vitta Beauty · Plano ${plan.name}`,
-      external_reference: `${professionalId}:${planTypeValue}`,
-      payer_email: professional.email,
-      back_url: `${applicationUrl}/dashboard/conta/assinatura?checkout=return`,
-      auto_recurring: {
-        frequency: plan.frequency,
-        frequency_type: "months",
-        transaction_amount: plan.amount,
-        currency_id: "BRL",
+      items: [
+        {
+          id: `vitta-plan-${planTypeValue.toLowerCase()}`,
+          title: `Vitta Beauty - Plano ${plan.name}`,
+          quantity: 1,
+          unit_price: plan.amount,
+          currency_id: "BRL",
+        },
+      ],
+      payer: { email: professional.email },
+      back_urls: {
+        success:
+          "https://vittabeauty.vercel.app/dashboard/conta/assinatura?status=success",
+        failure:
+          "https://vittabeauty.vercel.app/dashboard/conta/assinatura?status=failure",
+        pending:
+          "https://vittabeauty.vercel.app/dashboard/conta/assinatura?status=pending",
       },
-    } satisfies Parameters<PreApproval["create"]>[0]["body"];
+      auto_return: "approved",
+      external_reference: `${professionalId}:${planTypeValue}`,
+      notification_url: `${applicationUrl}/api/webhooks/mercadopago`,
+    } satisfies Parameters<Preference["create"]>[0]["body"];
     console.log("Payload enviado ao MP:", JSON.stringify(body, null, 2));
-    const subscription = await preApproval.create({
+    const checkoutPreference = await preference.create({
       body,
     });
 
-    const initUrl = subscription.init_point;
-    if (!subscription.id || !initUrl) {
+    const initUrl =
+      checkoutPreference.init_point ?? checkoutPreference.sandbox_init_point;
+    if (!initUrl) {
       throw new Error("Mercado Pago did not return checkout details.");
     }
-
-    await getPrismaClient().professional.update({
-      where: { id: professionalId },
-      data: { mpSubscriptionId: subscription.id },
-    });
 
     return { initUrl };
   } catch (error) {

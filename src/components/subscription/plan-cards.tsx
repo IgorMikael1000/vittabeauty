@@ -82,8 +82,8 @@ export function PlanCards() {
               {plan.intervalLabel}
             </p>
             <p className="mt-4 flex-1 text-sm leading-6 text-vitta-muted">
-              Acesso completo ao Vitta Beauty com cobrança recorrente pelo
-              Mercado Pago.
+              Acesso completo ao Vitta Beauty após a confirmação do pagamento
+              pelo Mercado Pago.
             </p>
             <SubscribeButton planType={planType} />
           </article>

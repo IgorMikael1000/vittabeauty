@@ -1,4 +1,10 @@
-import { Invoice, MercadoPagoConfig, PreApproval, WebhookSignatureValidator } from "mercadopago";
+import {
+  Invoice,
+  MercadoPagoConfig,
+  Payment,
+  PreApproval,
+  WebhookSignatureValidator,
+} from "mercadopago";
 import { Prisma } from "@/generated/prisma/client";
 import { NextResponse, type NextRequest } from "next/server";
 import { getPrismaClient } from "@/lib/prisma";
@@ -143,6 +149,79 @@ async function handleAuthorizedPayment(paymentId: string): Promise<void> {
   }
 }
 
+async function handlePreferencePayment(paymentId: string): Promise<void> {
+  const payment = await new Payment(getClient()).get({ id: paymentId });
+  const reference = getPlanReference(payment.external_reference);
+  if (!reference) return;
+
+  if (payment.status !== "approved") {
+    if (
+      (payment.status === "rejected" || payment.status === "cancelled") &&
+      payment.status_detail !== "pending_contingency" &&
+      payment.status_detail !== "pending_review_manual"
+    ) {
+      await getPrismaClient().professional.updateMany({
+        where: {
+          id: reference.professionalId,
+          expiresAt: { lte: new Date() },
+        },
+        data: { subscriptionStatus: "EXPIRED" },
+      });
+    }
+    return;
+  }
+
+  const paidAtCandidate = new Date(
+    payment.date_approved ?? payment.date_created ?? Date.now(),
+  );
+  const paidAt = Number.isNaN(paidAtCandidate.getTime())
+    ? new Date()
+    : paidAtCandidate;
+  const plan = subscriptionPlans[reference.planType];
+
+  try {
+    await getPrismaClient().$transaction(async (transaction) => {
+      await transaction.subscriptionPayment.create({
+        data: {
+          mercadoPagoPaymentId: paymentId,
+          professionalId: reference.professionalId,
+          planType: reference.planType,
+          paidAt,
+        },
+      });
+
+      const professional = await transaction.professional.findUnique({
+        where: { id: reference.professionalId },
+        select: { expiresAt: true },
+      });
+      if (!professional) {
+        throw new Error("Checkout payment references an unknown account.");
+      }
+
+      const baseTime = Math.max(
+        professional.expiresAt.getTime(),
+        paidAt.getTime(),
+      );
+      await transaction.professional.update({
+        where: { id: reference.professionalId },
+        data: {
+          subscriptionStatus: "ACTIVE",
+          planType: reference.planType,
+          expiresAt: new Date(baseTime + plan.durationDays * 24 * 60 * 60 * 1000),
+        },
+      });
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return;
+    }
+    throw error;
+  }
+}
+
 export async function POST(request: NextRequest) {
   const secret = process.env.MERCADOPAGO_WEBHOOK_SECRET;
   if (!secret) {
@@ -216,6 +295,8 @@ export async function POST(request: NextRequest) {
     await handlePreapproval(dataId);
   } else if (eventType.includes("authorized_payment")) {
     await handleAuthorizedPayment(dataId);
+  } else if (eventType === "payment" || eventType.startsWith("payment.")) {
+    await handlePreferencePayment(dataId);
   }
 
   return NextResponse.json({ received: true });
