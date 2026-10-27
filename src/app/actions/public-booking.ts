@@ -58,7 +58,7 @@ export async function createPublicBookingAction(
   const prisma = getPrismaClient();
   const professional = await prisma.professional.findUnique({
     where: { slug },
-    select: { id: true, timezone: true },
+    select: { id: true, timezone: true, pixKey: true },
   });
 
   if (!professional) {
@@ -94,11 +94,19 @@ export async function createPublicBookingAction(
       name: true,
       price: true,
       durationMinutes: true,
+      depositAmount: true,
     },
   });
 
   if (!service) {
     return { error: "Este serviço não está disponível para agendamento online." };
+  }
+
+  if (Number(service.depositAmount ?? 0) > 0 && !professional.pixKey) {
+    return {
+      error:
+        "O sinal deste serviço está temporariamente indisponível. Entre em contato com a profissional.",
+    };
   }
 
   const endsAt = new Date(
@@ -165,8 +173,9 @@ export async function createPublicBookingAction(
   const notes =
     typeof rawNotes === "string" ? rawNotes.trim().slice(0, 500) || null : null;
 
+  let appointmentId: string;
   try {
-    await prisma.$transaction(
+    appointmentId = await prisma.$transaction(
       async (transaction) => {
         const [appointmentConflict, blockConflict] = await Promise.all([
           transaction.appointment.findFirst({
@@ -224,6 +233,7 @@ export async function createPublicBookingAction(
             startsAt,
             endsAt,
             priceAtBooking: service.price,
+            depositAmount: service.depositAmount ?? 0,
             status: AppointmentStatus.PENDING,
             notes,
           },
@@ -242,6 +252,7 @@ export async function createPublicBookingAction(
             dueAt: startsAt,
           },
         });
+        return appointment.id;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
@@ -268,5 +279,11 @@ export async function createPublicBookingAction(
   revalidatePath("/dashboard/finance");
   revalidatePath("/dashboard/reports");
   revalidatePath("/dashboard");
-  redirect(`/agendar/${encodeURIComponent(slug)}?success=1`);
+  const search = new URLSearchParams({
+    success: "1",
+    appointmentId,
+  });
+  redirect(
+    `/agendar/${encodeURIComponent(slug)}?${search.toString()}`,
+  );
 }

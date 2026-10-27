@@ -15,10 +15,17 @@ const currency = new Intl.NumberFormat("pt-BR", {
 
 export default async function ServicesPage() {
   const professionalId = await getAuthenticatedProfessionalId();
-  const services = await getPrismaClient().service.findMany({
+  const prisma = getPrismaClient();
+  const [services, professional] = await Promise.all([
+    prisma.service.findMany({
     where: { professionalId },
     orderBy: [{ isActive: "desc" }, { name: "asc" }],
-  });
+    }),
+    prisma.professional.findUniqueOrThrow({
+      where: { id: professionalId },
+      select: { pixKey: true },
+    }),
+  ]);
 
   return (
     <section className="mx-auto w-full max-w-6xl">
@@ -34,7 +41,7 @@ export default async function ServicesPage() {
 
       <div className="mt-7 grid gap-6 lg:grid-cols-[minmax(280px,360px)_1fr]">
         <aside className="h-fit rounded-2xl border border-vitta-border bg-white p-5 shadow-card sm:p-6">
-          <ServiceForm />
+          <ServiceForm hasPixKey={Boolean(professional.pixKey)} />
         </aside>
 
         <div className="space-y-4">
@@ -85,6 +92,11 @@ export default async function ServicesPage() {
                     <p className="mt-1 text-xs text-vitta-muted">
                       Material: {currency.format(Number(service.materialCost))}
                     </p>
+                    {Number(service.depositAmount) > 0 && (
+                      <p className="mt-1 text-xs text-vitta-muted">
+                        Sinal: {currency.format(Number(service.depositAmount))}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <p className="mt-3 text-xs text-vitta-muted">
@@ -104,10 +116,12 @@ export default async function ServicesPage() {
                         description: service.description,
                         price: service.price.toString(),
                         materialCost: service.materialCost.toString(),
+                        depositAmount: service.depositAmount?.toString() ?? "0",
                         durationMinutes: service.durationMinutes,
                         onlineBookingEnabled: service.onlineBookingEnabled,
                         isActive: service.isActive,
                       }}
+                      hasPixKey={Boolean(professional.pixKey)}
                     />
                     <div>
                       <p className="mb-3 text-sm leading-6 text-vitta-muted">

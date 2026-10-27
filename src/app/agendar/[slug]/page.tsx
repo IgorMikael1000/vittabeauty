@@ -14,6 +14,7 @@ import {
 } from "@/lib/schedule";
 import { getPrismaClient } from "@/lib/prisma";
 import { AppointmentStatus } from "@/generated/prisma/client";
+import { getWhatsAppNumber } from "@/lib/whatsapp";
 
 type BookingPageProps = {
   params: Promise<{ slug: string }>;
@@ -21,6 +22,7 @@ type BookingPageProps = {
     date?: string;
     serviceId?: string;
     success?: string;
+    appointmentId?: string;
   }>;
 };
 
@@ -60,6 +62,8 @@ export default async function PublicBookingPage({
       id: true,
       name: true,
       timezone: true,
+      pixKey: true,
+      phone: true,
       services: {
         where: { isActive: true, onlineBookingEnabled: true },
         orderBy: { name: "asc" },
@@ -68,6 +72,7 @@ export default async function PublicBookingPage({
           name: true,
           description: true,
           price: true,
+          depositAmount: true,
           durationMinutes: true,
         },
       },
@@ -77,6 +82,39 @@ export default async function PublicBookingPage({
   if (!professional) {
     notFound();
   }
+
+  const successfulBooking =
+    query.success === "1" && query.appointmentId
+      ? await prisma.appointment.findFirst({
+          where: {
+            id: query.appointmentId,
+            professionalId: professional.id,
+          },
+          select: {
+            startsAt: true,
+            depositAmount: true,
+            service: { select: { name: true } },
+          },
+        })
+      : null;
+  const bookingDateTime = successfulBooking
+    ? new Intl.DateTimeFormat("pt-BR", {
+        timeZone: professional.timezone,
+        dateStyle: "full",
+        timeStyle: "short",
+      }).format(successfulBooking.startsAt)
+    : null;
+  const professionalWhatsApp = getWhatsAppNumber(professional.phone ?? "");
+  const depositValue = Number(successfulBooking?.depositAmount ?? 0);
+  const whatsappMessage = successfulBooking && bookingDateTime
+    ? `Olá! Acabei de solicitar o serviço ${successfulBooking.service.name} para ${bookingDateTime} no Vitta Beauty. Segue o comprovante do sinal de ${currency.format(depositValue)}.`
+    : "";
+  const whatsappHref =
+    successfulBooking &&
+    depositValue > 0 &&
+    professionalWhatsApp.length >= 12
+      ? `https://wa.me/${professionalWhatsApp}?text=${encodeURIComponent(whatsappMessage)}`
+      : null;
 
   const today = getDateInTimezone(new Date(), professional.timezone);
   const date = query.date ?? today;
@@ -182,13 +220,47 @@ export default async function PublicBookingPage({
 
         <div className="space-y-6 p-5 sm:p-8">
           {query.success === "1" && (
-            <p
-              className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900"
+            <section
+              className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950"
               role="status"
             >
-              Sua solicitação foi enviada. Aguarde a confirmação da
-              profissional pelo WhatsApp.
-            </p>
+              <p>
+                Sua solicitação foi enviada. Aguarde a confirmação da
+                profissional pelo WhatsApp.
+              </p>
+              {successfulBooking && depositValue > 0 && (
+                <div className="space-y-3 border-t border-emerald-200 pt-4">
+                  <div>
+                    <h2 className="font-semibold">
+                      Sinal necessário para confirmar
+                    </h2>
+                    <p className="mt-1">
+                      Envie o sinal de{" "}
+                      <strong>{currency.format(depositValue)}</strong> via PIX
+                      para a chave:
+                    </p>
+                    <p className="mt-2 break-all rounded-lg border border-emerald-200 bg-white/80 px-3 py-2 font-semibold">
+                      {professional.pixKey}
+                    </p>
+                  </div>
+                  {whatsappHref ? (
+                    <a
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3 text-center font-semibold text-white transition hover:bg-[#1fb95a]"
+                      href={whatsappHref}
+                      rel="noopener noreferrer"
+                      target="_blank"
+                    >
+                      Enviar comprovante pelo WhatsApp
+                    </a>
+                  ) : (
+                    <p className="text-xs text-emerald-900">
+                      Após o pagamento, envie o comprovante diretamente para a
+                      profissional pelo WhatsApp.
+                    </p>
+                  )}
+                </div>
+              )}
+            </section>
           )}
 
           {professional.services.length === 0 ? (
@@ -261,6 +333,12 @@ export default async function PublicBookingPage({
                       {currency.format(Number(selectedService.price))} ·{" "}
                       {selectedService.durationMinutes} minutos
                     </p>
+                    {Number(selectedService.depositAmount ?? 0) > 0 && (
+                      <p className="mt-2 rounded-lg bg-vitta-background px-3 py-2 text-sm font-medium text-vitta-text">
+                        Sinal para solicitar:{" "}
+                        {currency.format(Number(selectedService.depositAmount))}
+                      </p>
+                    )}
                     {formattedDate && (
                       <p className="mt-2 text-sm font-medium capitalize text-vitta-text">
                         {formattedDate}

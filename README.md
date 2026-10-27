@@ -78,8 +78,9 @@ apagar os valores existentes nela.
   atendimentos, sem coleta de data de nascimento. A exclusão é impedida quando
   há histórico, preservando os registros associados.
 - Serviços: cadastro e edição de nome, descrição, preço, custo estimado de
-  material, duração e permissão para agendamento online. A desativação é
-  reversível e preserva o histórico.
+  material, sinal opcional via PIX, duração e permissão para agendamento online.
+  A chave PIX é configurada pelo profissional; a desativação é reversível e
+  preserva o histórico.
 - Agenda: visualização diária, semanal e mensal; criação manual de
   atendimentos, cancelamento e conclusão; bloqueios de horários; e configuração
   de expediente por dia da semana.
@@ -100,6 +101,10 @@ apagar os valores existentes nela.
 - Compartilhe `/agendar/<slug>`: a página pública mostra apenas serviços
   ativos com agendamento online habilitado e horários calculados com base no
   expediente, atendimentos e bloqueios reais da profissional.
+- Se o serviço exigir sinal, a cliente recebe o valor e a chave PIX após
+  solicitar o horário, além de um atalho para enviar o comprovante ao WhatsApp
+  cadastrado da profissional. O sinal configurado é armazenado como snapshot
+  no atendimento.
 - A cliente informa nome e WhatsApp e solicita um horário sem criar conta. O
   atendimento é criado como pendente e precisa ser confirmado pela profissional.
 - O servidor valida novamente o serviço, expediente, data, horário e conflitos

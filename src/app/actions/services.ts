@@ -14,6 +14,7 @@ export async function saveServiceAction(
   const description = formData.get("description");
   const price = formData.get("price");
   const materialCost = formData.get("materialCost");
+  const depositAmount = formData.get("depositAmount");
   const durationMinutes = formData.get("durationMinutes");
   const serviceId = formData.get("serviceId");
 
@@ -22,6 +23,7 @@ export async function saveServiceAction(
     (description !== null && typeof description !== "string") ||
     typeof price !== "string" ||
     typeof materialCost !== "string" ||
+    (depositAmount !== null && typeof depositAmount !== "string") ||
     typeof durationMinutes !== "string" ||
     (serviceId !== null && typeof serviceId !== "string")
   ) {
@@ -33,6 +35,10 @@ export async function saveServiceAction(
   const pricePattern = /^(?:\d{1,7})(?:[.,]\d{1,2})?$/;
   const normalizedPrice = price.replace(",", ".");
   const normalizedMaterialCost = materialCost.replace(",", ".");
+  const normalizedDepositAmount =
+    typeof depositAmount === "string" && depositAmount.trim()
+      ? depositAmount.replace(",", ".")
+      : "0";
   const parsedDuration = Number(durationMinutes);
   const isUpdate = typeof serviceId === "string" && Boolean(serviceId.trim());
 
@@ -54,6 +60,31 @@ export async function saveServiceAction(
     };
   }
 
+  const professional = await getPrismaClient().professional.findUnique({
+    where: { id: professionalId },
+    select: { pixKey: true },
+  });
+  if (!professional) {
+    return { error: "Profissional não encontrado." };
+  }
+
+  if (
+    !/^(?:\d{1,8})(?:[.,]\d{1,2})?$/.test(normalizedDepositAmount) ||
+    !Number.isFinite(Number(normalizedDepositAmount)) ||
+    Number(normalizedDepositAmount) < 0 ||
+    Number(normalizedDepositAmount) > Number(normalizedPrice)
+  ) {
+    return {
+      error: "O valor do sinal deve ser igual ou maior que zero e não pode superar o preço do serviço.",
+    };
+  }
+
+  if (!professional.pixKey && Number(normalizedDepositAmount) > 0) {
+    return {
+      error: "Cadastre sua chave PIX antes de configurar um sinal para o serviço.",
+    };
+  }
+
   if (
     !Number.isInteger(parsedDuration) ||
     parsedDuration < 5 ||
@@ -71,6 +102,7 @@ export async function saveServiceAction(
     description: normalizedDescription,
     price: normalizedPrice,
     materialCost: normalizedMaterialCost,
+    depositAmount: normalizedDepositAmount,
     durationMinutes: parsedDuration,
     onlineBookingEnabled: formData.get("onlineBookingEnabled") === "on",
     isActive: isUpdate ? formData.get("isActive") === "on" : true,
@@ -99,6 +131,32 @@ export async function saveServiceAction(
   revalidatePath("/dashboard/calendar");
   revalidatePath("/dashboard/clients");
   return { success: serviceId ? "Serviço atualizado." : "Serviço cadastrado." };
+}
+
+export async function savePixKeyAction(
+  _previousState: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const professionalId = await getAuthenticatedProfessionalId();
+  const pixKeyValue = formData.get("pixKey");
+
+  if (typeof pixKeyValue !== "string") {
+    return { error: "Informe uma chave PIX válida." };
+  }
+
+  const pixKey = pixKeyValue.trim();
+  if (pixKey.length < 3 || pixKey.length > 200) {
+    return { error: "A chave PIX deve ter entre 3 e 200 caracteres." };
+  }
+
+  await getPrismaClient().professional.update({
+    where: { id: professionalId },
+    data: { pixKey },
+  });
+
+  revalidatePath("/dashboard/services");
+  revalidatePath("/agendar/[slug]", "page");
+  return { success: "Chave PIX salva." };
 }
 
 export async function toggleServiceActiveAction(
