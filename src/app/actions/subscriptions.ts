@@ -1,14 +1,17 @@
 "use server";
 
 import { MercadoPagoConfig, PreApproval } from "mercadopago";
-import { redirect } from "next/navigation";
-import type { FormState } from "@/app/actions/auth";
 import {
   isSubscriptionPlanType,
   subscriptionPlans,
 } from "@/lib/subscriptions";
 import { getAuthenticatedProfessionalId } from "@/lib/authenticated-professional";
 import { getPrismaClient } from "@/lib/prisma";
+
+type SubscriptionCheckoutState = {
+  error?: string;
+  initUrl?: string;
+};
 
 function serializeErrorDetails(error: unknown): string {
   const seen = new WeakSet<object>();
@@ -65,9 +68,9 @@ function getApplicationUrl(): string {
 }
 
 export async function createSubscriptionCheckoutAction(
-  _previousState: FormState,
+  _previousState: SubscriptionCheckoutState,
   formData: FormData,
-): Promise<FormState> {
+): Promise<SubscriptionCheckoutState> {
   const professionalId = await getAuthenticatedProfessionalId({
     allowExpired: true,
   });
@@ -97,8 +100,6 @@ export async function createSubscriptionCheckoutAction(
     return { error: "Profissional não encontrado." };
   }
 
-  let initPoint: string;
-  let subscriptionId: string;
   try {
     const applicationUrl = getApplicationUrl();
     const preApproval = new PreApproval(
@@ -121,26 +122,27 @@ export async function createSubscriptionCheckoutAction(
       body,
     });
 
-    if (!subscription.id || !subscription.init_point) {
+    const initUrl = subscription.init_point;
+    if (!subscription.id || !initUrl) {
       throw new Error("Mercado Pago did not return checkout details.");
     }
 
-    initPoint = subscription.init_point;
-    subscriptionId = subscription.id;
+    await getPrismaClient().professional.update({
+      where: { id: professionalId },
+      data: { mpSubscriptionId: subscription.id },
+    });
+
+    return { initUrl };
   } catch (error) {
     console.error(
       "[Mercado Pago] Falha detalhada ao criar assinatura:",
       serializeErrorDetails(error),
     );
     return {
-      error: "Não foi possível iniciar o checkout. Tente novamente em instantes.",
+      error:
+        error instanceof Error && error.message.trim()
+          ? error.message
+          : "Não foi possível iniciar o checkout. Tente novamente em instantes.",
     };
   }
-
-  await getPrismaClient().professional.update({
-    where: { id: professionalId },
-    data: { mpSubscriptionId: subscriptionId },
-  });
-
-  redirect(initPoint);
 }

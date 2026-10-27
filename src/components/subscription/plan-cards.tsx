@@ -1,20 +1,25 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { createSubscriptionCheckoutAction } from "@/app/actions/subscriptions";
-import type { FormState } from "@/app/actions/auth";
 import {
   subscriptionPlans,
   type SubscriptionPlanType,
 } from "@/lib/subscriptions";
 
-const initialState: FormState = {};
+const initialState: { error?: string; initUrl?: string } = {};
 
 function SubscribeButton({ planType }: { planType: SubscriptionPlanType }) {
   const [state, formAction, pending] = useActionState(
     createSubscriptionCheckoutAction,
     initialState,
   );
+
+  useEffect(() => {
+    if (state.initUrl) {
+      window.location.href = state.initUrl;
+    }
+  }, [state.initUrl]);
 
   return (
     <form action={formAction} className="mt-auto">
