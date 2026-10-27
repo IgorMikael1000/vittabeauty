@@ -118,9 +118,9 @@ export async function createSubscriptionCheckoutAction(
           Math.max(professional.expiresAt.getTime(), Date.now()),
         ).toISOString(),
       },
-      notification_url: `${applicationUrl}/api/webhooks/mercadopago`,
       status: "pending",
-    };
+    } satisfies Parameters<PreApproval["create"]>[0]["body"];
+    console.log("Payload enviado ao MP:", JSON.stringify(body, null, 2));
     const subscription = await preApproval.create({
       body,
     });
