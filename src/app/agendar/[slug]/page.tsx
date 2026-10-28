@@ -15,6 +15,7 @@ import {
 import { getPrismaClient } from "@/lib/prisma";
 import { AppointmentStatus } from "@/generated/prisma/client";
 import { getWhatsAppNumber } from "@/lib/whatsapp";
+import { getPublicBookingUrl } from "@/lib/public-url";
 
 type BookingPageProps = {
   params: Promise<{ slug: string }>;
@@ -37,16 +38,39 @@ export async function generateMetadata({
   const { slug } = await params;
   const professional = await getPrismaClient().professional.findUnique({
     where: { slug },
-    select: { name: true },
+    select: { name: true, specialty: true, logoUrl: true },
   });
 
+  if (!professional) {
+    return {
+      title: "Página não encontrada",
+      description: "Este link de agendamento não está disponível.",
+    };
+  }
+
+  const specialtyDescription = professional.specialty
+    ? `, especialista em ${professional.specialty}`
+    : "";
+  const description = `Agende online com ${professional.name}${specialtyDescription}. Consulte serviços e horários disponíveis no Vitta Beauty.`;
+  const bookingUrl = await getPublicBookingUrl(slug);
+  const profileImageUrl = professional.logoUrl?.startsWith("https://")
+    ? professional.logoUrl
+    : new URL("/brand/logo_vitta.png", bookingUrl).toString();
+
   return {
-    title: professional
-      ? `Agendar com ${professional.name}`
-      : "Agendamento online",
-    description: professional
-      ? `Consulte os serviços e horários de ${professional.name}.`
-      : "Agendamento online Vitta Beauty.",
+    title: `Agendar com ${professional.name}`,
+    description,
+    openGraph: {
+      title: `Agendar com ${professional.name}`,
+      description,
+      type: "website",
+      images: [
+        {
+          url: profileImageUrl,
+          alt: `Foto de ${professional.name}`,
+        },
+      ],
+    },
   };
 }
 
