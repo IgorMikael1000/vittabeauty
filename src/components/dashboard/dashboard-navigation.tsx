@@ -37,7 +37,9 @@ export function DashboardNavigation() {
         const active =
           item.href === "/dashboard"
             ? pathname === item.href
-            : pathname.startsWith(item.href);
+            : pathname.startsWith(item.href) ||
+              (item.href === "/dashboard/calendar" &&
+                pathname.startsWith("/dashboard/agenda"));
 
         return (
           <Link

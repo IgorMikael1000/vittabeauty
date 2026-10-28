@@ -11,6 +11,7 @@ import { getDayBounds, isValidBookingDate } from "@/lib/public-booking";
 import {
   getDateInTimezone,
   getWeekdayInTimezone,
+  isAvailableWorkingHoursSlot,
   parseDateTimeInTimezone,
 } from "@/lib/schedule";
 import { getPrismaClient } from "@/lib/prisma";
@@ -159,17 +160,13 @@ export async function createPublicBookingAction(
   const startMinute =
     Number(startValues.hour) * 60 + Number(startValues.minute);
   const endMinute = Number(endValues.hour) * 60 + Number(endValues.minute);
-  const onQuarterHour =
-    workingHours !== null &&
-    (startMinute - workingHours.startMinute) % 15 === 0;
-
   if (
     !workingHours?.isActive ||
-    startMinute < workingHours.startMinute ||
-    endMinute > workingHours.endMinute ||
-    !onQuarterHour
+    !isAvailableWorkingHoursSlot(startMinute, endMinute, workingHours)
   ) {
-    return { error: "O horário escolhido não está mais disponível." };
+    return {
+      error: "O horário escolhido não está mais disponível ou coincide com uma pausa.",
+    };
   }
 
   const rawNotes = formData.get("notes");

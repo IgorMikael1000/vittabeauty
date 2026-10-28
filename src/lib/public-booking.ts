@@ -1,6 +1,7 @@
 import {
   getDateInTimezone,
   getWeekdayInTimezone,
+  isAvailableWorkingHoursSlot,
   parseDateTimeInTimezone,
 } from "./schedule";
 
@@ -14,6 +15,8 @@ type BookingHours = {
   weekday: number;
   startMinute: number;
   endMinute: number;
+  interval: number;
+  blockedSlots: string[];
   isActive: boolean;
 };
 
@@ -111,7 +114,7 @@ export function buildAvailableSlots({
   for (
     let startMinute = workingHours.startMinute;
     startMinute + durationMinutes <= workingHours.endMinute;
-    startMinute += 15
+    startMinute += workingHours.interval
   ) {
     const hour = Math.floor(startMinute / 60)
       .toString()
@@ -129,6 +132,7 @@ export function buildAvailableSlots({
     if (
       getDateInTimezone(endsAt, timeZone) !== date ||
       getMinuteOfDay(endsAt, timeZone) > workingHours.endMinute ||
+      !isAvailableWorkingHoursSlot(startMinute, startMinute + durationMinutes, workingHours) ||
       busyPeriods.some(
         (period) => period.startsAt < endsAt && period.endsAt > startsAt,
       )

@@ -132,6 +132,8 @@ model WorkingHours {
   weekday        Int
   startMinute    Int
   endMinute      Int
+  interval       Int          @default(15)
+  blockedSlots   String[]     @default([])
   isActive       Boolean      @default(true)
   professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
 

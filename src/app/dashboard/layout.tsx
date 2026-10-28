@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { HelpCircle } from "lucide-react";
+import { HelpCircle, LogOut } from "lucide-react";
 import { logoutAction } from "@/app/actions/auth";
 import { auth } from "@/auth";
 import { DashboardNavigation } from "@/components/dashboard/dashboard-navigation";
@@ -99,27 +99,31 @@ export default async function DashboardLayout({
       </aside>
 
       <div className="flex min-h-[calc(100vh-9.5rem)] min-w-0 flex-1 flex-col md:min-h-screen">
-        <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-[#e9e1ed]/70 bg-[#f9f7fa]/85 px-5 py-3.5 backdrop-blur-xl sm:px-8 md:px-10">
-          <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-vitta-muted/75">
-              Espaço profissional
-            </p>
-            <p className="mt-0.5 truncate text-[13px] font-semibold tracking-[-0.01em] text-vitta-text">
-              {professional.name}
-            </p>
-            <p className="truncate text-[11px] font-medium text-vitta-muted">
-              {professional.specialty ?? "Profissional da beleza"}
-            </p>
+        <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-[#e9e1ed]/70 bg-[#f9f7fa]/85 px-3 py-3.5 backdrop-blur-xl sm:gap-4 sm:px-8 md:px-10">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-vitta-muted/75">
+                Espaço profissional
+              </p>
+              <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                <p className="min-w-0 truncate text-[13px] font-semibold tracking-[-0.01em] text-vitta-text">
+                  {professional.name}
+                </p>
+                {professional.role === "ADMIN" && (
+                  <Link
+                    className="shrink-0 rounded-full border border-vitta/20 bg-white/80 px-2.5 py-1 text-[10px] font-semibold leading-none text-vitta transition hover:bg-white"
+                    href="/admin"
+                  >
+                    Admin
+                  </Link>
+                )}
+              </div>
+              <p className="truncate text-[11px] font-medium text-vitta-muted">
+                {professional.specialty ?? "Profissional da beleza"}
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            {professional.role === "ADMIN" && (
-              <Link
-                className="rounded-full border border-vitta/20 bg-white/80 px-3.5 py-2 text-xs font-semibold text-vitta transition hover:bg-white"
-                href="/admin"
-              >
-                Admin
-              </Link>
-            )}
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <span aria-hidden="true" className="hidden h-8 w-px bg-[#e9e1ed] sm:block" />
             <Link
               aria-label="Abrir Minha Conta"
@@ -141,18 +145,21 @@ export default async function DashboardLayout({
             </Link>
             <form action={logoutAction}>
               <button
-                className="rounded-full border border-[#e8e0ec] bg-white/80 px-3.5 py-2 text-xs font-semibold text-vitta-text/75 transition hover:border-vitta/30 hover:bg-white hover:text-vitta"
+                aria-label="Sair"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#e8e0ec] bg-white/80 p-2 text-xs font-semibold text-vitta-text/75 transition hover:border-vitta/30 hover:bg-white hover:text-vitta md:h-auto md:w-auto md:gap-1.5 md:px-3.5 md:py-2"
                 type="submit"
               >
-                Sair
+                <LogOut aria-hidden="true" className="h-4 w-4" />
+                <span className="hidden md:inline-block">Sair</span>
               </button>
             </form>
             <Link
-              className="inline-flex items-center gap-1.5 rounded-full bg-vitta px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-vitta/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vitta focus-visible:ring-offset-2"
+              aria-label="Me ajude"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-vitta p-2 text-xs font-semibold text-white transition hover:bg-vitta/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vitta focus-visible:ring-offset-2 md:h-auto md:w-auto md:gap-1.5 md:px-3.5 md:py-2"
               href="/dashboard/ajuda"
             >
               <HelpCircle aria-hidden="true" className="h-4 w-4" />
-              Me ajude
+              <span className="hidden md:inline-block">Me ajude</span>
             </Link>
           </div>
         </header>

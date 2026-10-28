@@ -1,5 +1,6 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -9,7 +10,7 @@ export const metadata: Metadata = {
   },
   applicationName: "Vitta Beauty",
   description: "Gestão simples e acolhedora para profissionais da beleza.",
-  manifest: "/manifest.webmanifest",
+  manifest: "/manifest.json",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "32x32", type: "image/x-icon" },
@@ -25,12 +26,20 @@ export const metadata: Metadata = {
     title: "Vitta Beauty",
     statusBarStyle: "default",
   },
+  other: {
+    "apple-mobile-web-app-capable": "yes",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#7950A5",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="pt-BR" className="h-full antialiased">
       <body className="flex min-h-full flex-col">
+        <ServiceWorkerRegistration />
         <main className="flex flex-1 flex-col">{children}</main>
         <footer className="border-t border-vitta-border px-6 py-4 text-center text-xs text-vitta-muted">
           Desenvolvido pela{" "}

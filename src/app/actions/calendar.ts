@@ -11,6 +11,7 @@ import { getAuthenticatedProfessionalId } from "@/lib/authenticated-professional
 import {
   getDateInTimezone,
   getWeekdayInTimezone,
+  isAvailableWorkingHoursSlot,
   parseDateTimeInTimezone,
 } from "@/lib/schedule";
 import { getPrismaClient } from "@/lib/prisma";
@@ -68,10 +69,13 @@ async function ensureSlotIsAvailable(
 
   if (
     !workingHours?.isActive ||
-    localStartMinute < workingHours.startMinute ||
-    localEndMinute > workingHours.endMinute
+    !isAvailableWorkingHoursSlot(
+      localStartMinute,
+      localEndMinute,
+      workingHours,
+    )
   ) {
-    return "O horário está fora do expediente configurado.";
+    return "O horário está fora do expediente ou coincide com uma pausa configurada.";
   }
 
   const [appointmentConflict, blockConflict] = await Promise.all([
@@ -233,103 +237,6 @@ export async function createAppointmentAction(
   revalidatePath("/dashboard/calendar");
   revalidatePath("/dashboard/clients");
   return { success: "Atendimento agendado." };
-}
-
-export async function createCalendarBlockAction(
-  _previousState: FormState,
-  formData: FormData,
-): Promise<FormState> {
-  const professionalId = await getAuthenticatedProfessionalId();
-  const prisma = getPrismaClient();
-  const professional = await prisma.professional.findUnique({
-    where: { id: professionalId },
-    select: { timezone: true },
-  });
-
-  if (!professional) {
-    return { error: "Profissional não encontrado." };
-  }
-
-  const startsAt = readDateTime(formData.get("startsAt"), professional.timezone);
-  const endsAt = readDateTime(formData.get("endsAt"), professional.timezone);
-  const rawReason = formData.get("reason");
-
-  if (
-    !startsAt ||
-    !endsAt ||
-    startsAt <= new Date() ||
-    endsAt <= startsAt ||
-    getDateInTimezone(startsAt, professional.timezone) !==
-      getDateInTimezone(endsAt, professional.timezone)
-  ) {
-    return { error: "Informe um período futuro válido para o bloqueio." };
-  }
-
-  if (rawReason !== null && typeof rawReason !== "string") {
-    return { error: "Motivo do bloqueio inválido." };
-  }
-
-  const reason = typeof rawReason === "string" ? rawReason.trim() || null : null;
-
-  if ((reason?.length ?? 0) > 120) {
-    return { error: "O motivo deve ter no máximo 120 caracteres." };
-  }
-
-  try {
-    await prisma.$transaction(
-      async (transaction) => {
-        const [appointmentConflict, blockConflict] = await Promise.all([
-          transaction.appointment.findFirst({
-            where: {
-              professionalId,
-              status: { in: activeAppointmentStatuses },
-              startsAt: { lt: endsAt },
-              endsAt: { gt: startsAt },
-            },
-            select: { id: true },
-          }),
-          transaction.calendarBlock.findFirst({
-            where: {
-              professionalId,
-              startsAt: { lt: endsAt },
-              endsAt: { gt: startsAt },
-            },
-            select: { id: true },
-          }),
-        ]);
-
-        if (appointmentConflict || blockConflict) {
-          throw new SlotValidationError(
-            "Este período conflita com outro atendimento ou bloqueio.",
-          );
-        }
-
-        await transaction.calendarBlock.create({
-          data: { professionalId, startsAt, endsAt, reason },
-        });
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    );
-  } catch (error) {
-    if (error instanceof SlotValidationError) {
-      return { error: error.message };
-    }
-
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2034"
-    ) {
-      return {
-        error:
-          "A agenda foi alterada por outra operação. Atualize a página e tente novamente.",
-      };
-    }
-
-    throw error;
-  }
-
-  revalidatePath("/dashboard/calendar");
-  return { success: "Horário bloqueado." };
 }
 
 export async function deleteCalendarBlockAction(
@@ -520,67 +427,142 @@ export async function updateAppointmentStatusAction(
   };
 }
 
-export async function saveWorkingHoursAction(
+export async function saveWorkingHoursRulesAction(
   _previousState: FormState,
   formData: FormData,
 ): Promise<FormState> {
   const professionalId = await getAuthenticatedProfessionalId();
-  const days = Array.from({ length: 7 }, (_, weekday) => {
-    const active = formData.get(`day-${weekday}-active`) === "on";
-    const start = formData.get(`day-${weekday}-start`);
-    const end = formData.get(`day-${weekday}-end`);
+  const rawStart = formData.get("startTime");
+  const rawEnd = formData.get("endTime");
+  const rawInterval = formData.get("interval");
+  const rawBlockedSlots = formData.get("blockedSlots");
+  const applyTo = formData.get("applyTo");
+  const rawWeekday = formData.get("weekday");
 
-    if (typeof start !== "string" || typeof end !== "string") {
-      return { error: `Configure os horários de ${weekday}.` } as const;
-    }
+  if (
+    typeof rawStart !== "string" ||
+    typeof rawEnd !== "string" ||
+    typeof rawInterval !== "string" ||
+    typeof rawBlockedSlots !== "string" ||
+    (applyTo !== "all" && applyTo !== "day")
+  ) {
+    return { error: "As regras enviadas são inválidas." };
+  }
 
-    const minutePattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
-    const startMatch = minutePattern.exec(start);
-    const endMatch = minutePattern.exec(end);
-    const startMinute = startMatch
-      ? Number(startMatch[1]) * 60 + Number(startMatch[2])
-      : -1;
-    const endMinute = endMatch
-      ? Number(endMatch[1]) * 60 + Number(endMatch[2])
-      : -1;
+  const minutePattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
+  const startMatch = minutePattern.exec(rawStart);
+  const endMatch = minutePattern.exec(rawEnd);
+  const startMinute = startMatch
+    ? Number(startMatch[1]) * 60 + Number(startMatch[2])
+    : -1;
+  const endMinute = endMatch
+    ? Number(endMatch[1]) * 60 + Number(endMatch[2])
+    : -1;
+  const interval = Number(rawInterval);
 
-    if (active && (startMinute < 0 || endMinute <= startMinute)) {
-      return {
-        error: "O fim do expediente precisa ser posterior ao início.",
-      } as const;
-    }
+  if (
+    startMinute < 0 ||
+    endMinute <= startMinute ||
+    ![15, 30, 45, 60].includes(interval)
+  ) {
+    return { error: "Informe expediente e intervalo válidos." };
+  }
 
+  let blockedSlots: unknown;
+  try {
+    blockedSlots = JSON.parse(rawBlockedSlots);
+  } catch {
+    return { error: "A lista de pausas selecionadas é inválida." };
+  }
+
+  if (
+    !Array.isArray(blockedSlots) ||
+    !blockedSlots.every((slot): slot is string => typeof slot === "string")
+  ) {
+    return { error: "A lista de pausas selecionadas é inválida." };
+  }
+
+  const uniqueBlockedSlots = [...new Set(blockedSlots)];
+  if (
+    uniqueBlockedSlots.some((slot) => {
+      const match = minutePattern.exec(slot);
+      if (!match) return true;
+
+      const minute = Number(match[1]) * 60 + Number(match[2]);
+      return (
+        minute < startMinute ||
+        minute + interval > endMinute ||
+        (minute - startMinute) % interval !== 0
+      );
+    })
+  ) {
     return {
-      weekday,
-      startMinute: active ? startMinute : 9 * 60,
-      endMinute: active ? endMinute : 17 * 60,
-      isActive: active,
-    } as const;
-  });
+      error: "As pausas precisam coincidir com os intervalos do expediente.",
+    };
+  }
 
-  const invalidDay = days.find((day) => "error" in day);
+  const rawActiveWeekdays = formData.getAll("activeWeekday");
+  const activeWeekdays = rawActiveWeekdays.map((value) =>
+    typeof value === "string" ? Number(value) : -1,
+  );
+  if (
+    activeWeekdays.some(
+      (weekday) => !Number.isInteger(weekday) || weekday < 0 || weekday > 6,
+    )
+  ) {
+    return { error: "A seleção de dias de funcionamento é inválida." };
+  }
 
-  if (invalidDay && "error" in invalidDay) {
-    return { error: invalidDay.error };
+  let weekdaysToSave: number[];
+  if (applyTo === "all") {
+    weekdaysToSave = [...new Set(activeWeekdays)];
+    if (weekdaysToSave.length === 0) {
+      return { error: "Selecione ao menos um dia de funcionamento." };
+    }
+  } else {
+    const weekday = typeof rawWeekday === "string" ? Number(rawWeekday) : -1;
+    if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) {
+      return { error: "Selecione um dia da semana válido." };
+    }
+    weekdaysToSave = [weekday];
   }
 
   const prisma = getPrismaClient();
-  await prisma.$transaction(
-    days.map((day) => {
-      if ("error" in day) {
-        throw new Error(day.error);
-      }
+  const values = { startMinute, endMinute, interval, blockedSlots: uniqueBlockedSlots };
+  await prisma.$transaction(async (transaction) => {
+    if (applyTo === "all") {
+      await Promise.all(
+        Array.from({ length: 7 }, (_, weekday) => {
+          const isActive = weekdaysToSave.includes(weekday);
+          return transaction.workingHours.upsert({
+            where: { professionalId_weekday: { professionalId, weekday } },
+            create: {
+              professionalId,
+              weekday,
+              ...values,
+              isActive,
+            },
+            update: isActive ? { ...values, isActive: true } : { isActive: false },
+          });
+        }),
+      );
+      return;
+    }
 
-      const { weekday, ...data } = day;
+    const weekday = weekdaysToSave[0];
+    await transaction.workingHours.upsert({
+      where: { professionalId_weekday: { professionalId, weekday } },
+      create: {
+        professionalId,
+        weekday,
+        ...values,
+        isActive: true,
+      },
+      update: { ...values, isActive: true },
+    });
+  });
 
-      return prisma.workingHours.upsert({
-        where: { professionalId_weekday: { professionalId, weekday } },
-        create: { professionalId, weekday, ...data },
-        update: data,
-      });
-    }),
-  );
-
+  revalidatePath("/dashboard/agenda/configuracoes");
   revalidatePath("/dashboard/calendar");
-  return { success: "Horários de funcionamento salvos." };
+  return { success: "Regras de funcionamento salvas." };
 }

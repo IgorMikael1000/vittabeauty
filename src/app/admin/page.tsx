@@ -69,6 +69,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const rangeStart = new Date(`${from}T00:00:00-03:00`);
   const rangeEnd = new Date(`${to}T23:59:59.999-03:00`);
   const prisma = getPrismaClient();
+  const professionalOnly = { role: "PROFESSIONAL" as const };
+  const professionalPaymentsOnly = { professional: professionalOnly };
 
   await prisma.adminAuditLog.create({
     data: {
@@ -90,20 +92,29 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     recentProfessionals,
     recentPayments,
   ] = await Promise.all([
-    prisma.professional.count(),
-    prisma.professional.count({ where: { expiresAt: { gt: now } } }),
+    prisma.professional.count({ where: professionalOnly }),
+    prisma.professional.count({
+      where: { ...professionalOnly, expiresAt: { gt: now } },
+    }),
     prisma.professional.count({
       where: {
+        ...professionalOnly,
         subscriptionStatus: "TRIAL",
         expiresAt: { gt: now },
       },
     }),
-    prisma.professional.count({ where: { expiresAt: { lte: now } } }),
     prisma.professional.count({
-      where: { createdAt: { gte: rangeStart, lte: rangeEnd } },
+      where: { ...professionalOnly, expiresAt: { lte: now } },
+    }),
+    prisma.professional.count({
+      where: {
+        ...professionalOnly,
+        createdAt: { gte: rangeStart, lte: rangeEnd },
+      },
     }),
     prisma.subscriptionPayment.aggregate({
       where: {
+        ...professionalPaymentsOnly,
         status: "approved",
         paidAt: { gte: rangeStart, lte: rangeEnd },
       },
@@ -112,6 +123,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     }),
     prisma.subscriptionPayment.count({
       where: {
+        ...professionalPaymentsOnly,
         status: "approved",
         amount: null,
         paidAt: { gte: rangeStart, lte: rangeEnd },
@@ -119,6 +131,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     }),
     prisma.subscriptionPayment.count({
       where: {
+        ...professionalPaymentsOnly,
         status: { in: ["pending", "in_process"] },
         OR: [
           { paidAt: { gte: rangeStart, lte: rangeEnd } },
@@ -128,6 +141,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     }),
     prisma.subscriptionPayment.count({
       where: {
+        ...professionalPaymentsOnly,
         status: { in: ["refunded", "charged_back"] },
         OR: [
           { paidAt: { gte: rangeStart, lte: rangeEnd } },
@@ -136,6 +150,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       },
     }),
     prisma.professional.findMany({
+      where: professionalOnly,
       orderBy: { createdAt: "desc" },
       take: 100,
       select: {
@@ -151,6 +166,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     }),
     prisma.subscriptionPayment.findMany({
       where: {
+        ...professionalPaymentsOnly,
         OR: [
           { paidAt: { gte: rangeStart, lte: rangeEnd } },
           { createdAt: { gte: rangeStart, lte: rangeEnd } },

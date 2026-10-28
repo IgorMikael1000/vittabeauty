@@ -1,6 +1,36 @@
 const LOCAL_DATE_TIME_PATTERN =
   /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
 
+export type WorkingHoursSlotRules = {
+  startMinute: number;
+  endMinute: number;
+  interval: number;
+  blockedSlots: string[];
+};
+
+export function isAvailableWorkingHoursSlot(
+  startMinute: number,
+  endMinute: number,
+  rules: WorkingHoursSlotRules,
+): boolean {
+  if (
+    rules.interval <= 0 ||
+    startMinute < rules.startMinute ||
+    endMinute > rules.endMinute ||
+    (startMinute - rules.startMinute) % rules.interval !== 0
+  ) {
+    return false;
+  }
+
+  return !rules.blockedSlots.some((slot) => {
+    const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(slot);
+    if (!match) return false;
+
+    const blockedStart = Number(match[1]) * 60 + Number(match[2]);
+    return blockedStart < endMinute && blockedStart + rules.interval > startMinute;
+  });
+}
+
 export function parseDateTimeInTimezone(
   value: string,
   timeZone: string,

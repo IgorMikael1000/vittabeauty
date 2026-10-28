@@ -63,8 +63,7 @@ export default async function CalendarPage({
     select: { timezone: true, name: true },
   });
   const range = getCalendarRange(params.date, params.view, professional.timezone);
-  const [appointments, blocks, clients, services, workingHours] =
-    await Promise.all([
+  const [appointments, blocks, clients, services] = await Promise.all([
       prisma.appointment.findMany({
         where: {
           professionalId,
@@ -95,16 +94,6 @@ export default async function CalendarPage({
         },
         orderBy: { name: "asc" },
         select: { id: true, name: true, durationMinutes: true },
-      }),
-      prisma.workingHours.findMany({
-        where: { professionalId },
-        orderBy: { weekday: "asc" },
-        select: {
-          weekday: true,
-          startMinute: true,
-          endMinute: true,
-          isActive: true,
-        },
       }),
     ]);
 
@@ -148,14 +137,22 @@ export default async function CalendarPage({
 
   return (
     <section className="mx-auto w-full max-w-6xl">
-      <div>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
         <p className="text-sm font-medium text-vitta">Organização</p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight text-vitta-text sm:text-3xl">
           Agenda
         </h1>
         <p className="mt-2 text-sm text-vitta-muted">
-          Consulte compromissos, organize horários e ajuste seu expediente.
+          Consulte compromissos e organize sua rotina.
         </p>
+        </div>
+        <Link
+          className="rounded-xl border border-vitta-border bg-white px-4 py-2.5 text-sm font-semibold text-vitta-text transition hover:border-vitta/30 hover:text-vitta"
+          href="/dashboard/agenda/configuracoes"
+        >
+          Configurações de funcionamento
+        </Link>
       </div>
 
       <div className="mt-7 grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -375,7 +372,6 @@ export default async function CalendarPage({
           <ScheduleForms
             clients={clients}
             services={services}
-            workingHours={workingHours}
           />
         </aside>
       </div>
