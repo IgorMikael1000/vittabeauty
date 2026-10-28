@@ -10,7 +10,6 @@ import {
   signOut,
 } from "firebase/auth";
 import {
-  loginWithFirebaseAction,
   registerAction,
   type FormState,
 } from "@/app/actions/auth";
@@ -124,12 +123,9 @@ export function RegistrationWizard({
       const result = await registerAction(previousState, formData);
       if (result.error) return result;
       if (googleRegistration) {
-        const signInResult = await loginWithFirebaseAction(idToken);
-        return (
-          signInResult.error
-            ? { error: signInResult.error }
-            : { error: "Não foi possível iniciar a sessão. Tente novamente." }
-        );
+        router.replace("/dashboard");
+        router.refresh();
+        return result;
       }
 
       try {

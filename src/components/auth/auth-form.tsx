@@ -76,13 +76,21 @@ export function AuthForm({
 
     const result = await loginWithFirebaseAction(await user.getIdToken(true));
     if (result.registrationRequired && result.email) {
+      const emailQuery = encodeURIComponent(result.email);
       router.push(
-        `/cadastro?method=google&email=${encodeURIComponent(result.email)}`,
+        result.googleRegistration
+          ? `/cadastro/complemento?email=${emailQuery}`
+          : `/cadastro?email=${emailQuery}`,
       );
       return;
     }
     if (result.error) {
       setError(result.error);
+      return;
+    }
+    if (result.success) {
+      router.replace("/dashboard");
+      router.refresh();
       return;
     }
     setError("Não foi possível iniciar a sessão. Tente novamente.");

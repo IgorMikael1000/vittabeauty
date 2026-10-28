@@ -1,11 +1,13 @@
 "use server";
 
 import { Prisma } from "@/generated/prisma/client";
-import { AuthError } from "next-auth";
 import { compare } from "bcryptjs";
-import { signIn, signOut } from "@/auth";
 import { getCpfDigits, hasValidProfessionalName, isValidCpf } from "@/lib/professional-validation";
 import { verifyFirebaseIdToken } from "@/lib/firebase-id-token";
+import {
+  clearFirebaseSession,
+  createFirebaseSession,
+} from "@/lib/firebase-session";
 import { getPrismaClient } from "@/lib/prisma";
 
 export type FormState = {
@@ -15,9 +17,30 @@ export type FormState = {
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+async function createSessionResult(
+  idToken: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await createFirebaseSession(idToken);
+    return { success: true };
+  } catch (error) {
+    console.error("Could not create the Firebase application session.", error);
+    return {
+      success: false,
+      error: "Não foi possível iniciar a sessão. Tente novamente.",
+    };
+  }
+}
+
 export async function loginWithFirebaseAction(
   idToken: string,
-): Promise<{ registrationRequired?: boolean; email?: string; error?: string }> {
+): Promise<{
+  registrationRequired?: boolean;
+  email?: string;
+  googleRegistration?: boolean;
+  success?: boolean;
+  error?: string;
+}> {
   let identity;
   try {
     identity = await verifyFirebaseIdToken(idToken);
@@ -72,7 +95,11 @@ export async function loginWithFirebaseAction(
   }
 
   if (!professional) {
-    return { registrationRequired: true, email: identity.email };
+    return {
+      registrationRequired: true,
+      email: identity.email,
+      googleRegistration: identity.providers.includes("google.com"),
+    };
   }
 
   if (professional.firebaseUid && professional.firebaseUid !== identity.uid) {
@@ -91,19 +118,7 @@ export async function loginWithFirebaseAction(
     });
   }
 
-  try {
-    await signIn("firebase", {
-      idToken,
-      redirectTo: "/dashboard",
-    });
-  } catch (error) {
-    if (error instanceof AuthError) {
-      return { error: "Não foi possível iniciar a sessão. Tente novamente." };
-    }
-    throw error;
-  }
-
-  return {};
+  return createSessionResult(idToken);
 }
 
 export async function registerAction(
@@ -175,6 +190,24 @@ export async function registerAction(
   }
 
   const prisma = getPrismaClient();
+  const existingByUid = await prisma.professional.findUnique({
+    where: { firebaseUid: identity.uid },
+    select: { id: true, email: true },
+  });
+  if (existingByUid) {
+    if (
+      method !== "google" ||
+      existingByUid.email !== email ||
+      identity.email !== email
+    ) {
+      return { error: "Esta conta Firebase já possui um cadastro." };
+    }
+    const sessionResult = await createSessionResult(idToken);
+    return sessionResult.success
+      ? { success: "Cadastro realizado." }
+      : { error: sessionResult.error };
+  }
+
   const duplicate = await prisma.professional.findFirst({
     where: { OR: [{ email }, { cpf }, { firebaseUid: identity.uid }] },
     select: { email: true, cpf: true },
@@ -214,6 +247,13 @@ export async function registerAction(
           expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
         },
       });
+
+      if (method === "google") {
+        const sessionResult = await createSessionResult(idToken);
+        if (!sessionResult.success) {
+          return { error: sessionResult.error };
+        }
+      }
 
       return { success: "Cadastro realizado." };
     } catch (error) {
@@ -309,5 +349,5 @@ export async function linkLegacyFirebaseAccountAction(
 }
 
 export async function logoutAction(): Promise<void> {
-  await signOut({ redirectTo: "/login" });
+  await clearFirebaseSession();
 }

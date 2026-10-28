@@ -25,12 +25,15 @@ I&T Solutions com Next.js, TypeScript, Tailwind CSS, Prisma e PostgreSQL na Neon
    ```
 
 3. Configure `DATABASE_URL` com a connection string pooled da Neon,
-   `DIRECT_URL` com a connection string direta, `AUTH_SECRET` com um segredo
-   aleatório, `NEXT_PUBLIC_APP_URL` com a origem local e as seis variáveis
-   `NEXT_PUBLIC_FIREBASE_*` com a configuração do app Web do Firebase. No
-   Firebase Console, habilite os provedores E-mail/senha e Google e configure
-   os domínios autorizados para desenvolvimento e produção. O segredo pode ser
-   gerado com `npx auth secret`.
+   `DIRECT_URL` com a connection string direta, `NEXT_PUBLIC_APP_URL` com a
+   origem local, as seis variáveis `NEXT_PUBLIC_FIREBASE_*` com a configuração
+   do app Web e `FIREBASE_SERVICE_ACCOUNT_JSON` com o JSON de uma conta de
+   serviço Firebase. No Firebase Console, habilite os provedores E-mail/senha e
+   Google e configure os domínios autorizados para desenvolvimento e produção.
+   O JSON deve vir de uma conta de serviço do mesmo projeto Firebase; mantenha-o
+   somente no servidor e nunca use o prefixo `NEXT_PUBLIC_` nessa variável.
+   Configure o JSON completo como um único valor de ambiente; não publique nem
+   versione a chave privada.
 
 4. Crie as tabelas no banco:
 
@@ -62,8 +65,6 @@ apagar os valores existentes nela.
 
 ## Fundação e segurança
 
-- O Auth.js usa credenciais e sessões JWT em cookies seguros; senhas são
-  armazenadas com hash bcrypt.
 - O cadastro exige nome e sobrenome, CPF validado, telefone, especialidade e
   senha com requisitos de segurança em duas etapas; o nome pode ser o nome
   profissional, do negócio ou uma combinação (por exemplo, "Ana HairStudio").
@@ -96,8 +97,8 @@ apagar os valores existentes nela.
   telefone/especialidade, alterar senha após confirmar a senha atual e enviar
   uma foto de perfil comprimida no navegador para WebP 256x256. A imagem é
   validada no servidor e limitada a 50 KB antes de ser armazenada. O CPF fica
-  somente para leitura; alterações de senha são verificadas no servidor e
-  armazenadas com hash bcrypt.
+  somente para leitura; a senha é reautenticada e atualizada pelo Firebase
+  Authentication.
 
 ## Agendamento público
 
@@ -151,8 +152,9 @@ apagar os valores existentes nela.
   política de referência e permissões de recursos. HSTS é habilitado em
   produção; o link público exige `NEXT_PUBLIC_APP_URL` com HTTPS nesse ambiente.
 - A autenticação de usuários e a verificação de e-mail são gerenciadas pelo
-  Firebase Authentication. O NextAuth mantém a sessão local da aplicação após
-  validar o ID token do Firebase no servidor.
+  Firebase Authentication. O Firebase Admin valida ID tokens e cria cookies de
+  sessão HTTP-only, Secure em produção e SameSite=Lax. O Proxy do Next.js e as
+  páginas/ações protegidas validam esses cookies no servidor.
 - Configure também limites de requisição no provedor de borda para login,
   cadastro e envio de solicitações públicas antes da exposição à internet.
 - O trial profissional dura três dias a partir do cadastro. Após o vencimento,
@@ -174,7 +176,9 @@ variáveis no projeto antes do primeiro deploy:
 
 - `DATABASE_URL`: connection string pooled da Neon.
 - `DIRECT_URL`: connection string direta da Neon para operações do Prisma CLI.
-- `AUTH_SECRET`: segredo aleatório forte e exclusivo de produção.
+- `FIREBASE_SERVICE_ACCOUNT_JSON`: JSON de credenciais da conta de serviço do
+  mesmo projeto Firebase. É confidencial e deve ser configurado somente como
+  variável de ambiente server-side.
 - `NEXT_PUBLIC_APP_URL`: origem pública HTTPS, por exemplo
   `https://seu-dominio.com`.
 - `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`,

@@ -3,24 +3,22 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { HelpCircle, LogOut } from "lucide-react";
-import { auth } from "@/auth";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { DashboardNavigation } from "@/components/dashboard/dashboard-navigation";
 import { WelcomeTour } from "@/components/onboarding/welcome-tour";
 import { PlanCards } from "@/components/subscription/plan-cards";
+import { getAuthenticatedProfessionalId } from "@/lib/authenticated-professional";
 import { getPrismaClient } from "@/lib/prisma";
 
 export default async function DashboardLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    redirect("/login");
-  }
+  const professionalId = await getAuthenticatedProfessionalId({
+    allowExpired: true,
+  });
 
   const professional = await getPrismaClient().professional.findUnique({
-    where: { id: session.user.id },
+    where: { id: professionalId },
     select: {
       id: true,
       name: true,

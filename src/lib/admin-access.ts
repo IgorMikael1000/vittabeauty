@@ -1,16 +1,15 @@
 import "server-only";
 import { redirect } from "next/navigation";
-import { auth } from "@/auth";
+import { getAuthenticatedProfessionalId } from "@/lib/authenticated-professional";
 import { getPrismaClient } from "@/lib/prisma";
 
 export async function requireAdmin(): Promise<string> {
-  const session = await auth();
-  if (!session?.user?.id) {
-    redirect("/login");
-  }
+  const professionalId = await getAuthenticatedProfessionalId({
+    allowExpired: true,
+  });
 
   const professional = await getPrismaClient().professional.findUnique({
-    where: { id: session.user.id },
+    where: { id: professionalId },
     select: { role: true },
   });
   if (!professional) {
@@ -20,5 +19,5 @@ export async function requireAdmin(): Promise<string> {
     redirect("/dashboard");
   }
 
-  return session.user.id;
+  return professionalId;
 }

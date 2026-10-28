@@ -1,31 +1,40 @@
 import "server-only";
 import { redirect } from "next/navigation";
-import { auth } from "@/auth";
+import { getFirebaseSession } from "@/lib/firebase-session";
 import { getPrismaClient } from "@/lib/prisma";
+
+export async function getCurrentProfessionalId(): Promise<string | null> {
+  const session = await getFirebaseSession();
+  if (!session) return null;
+
+  const professional = await getPrismaClient().professional.findUnique({
+    where: { firebaseUid: session.uid },
+    select: { id: true },
+  });
+  return professional?.id ?? null;
+}
 
 export async function getAuthenticatedProfessionalId(
   options: { allowExpired?: boolean } = {},
 ): Promise<string> {
-  const session = await auth();
+  const session = await getFirebaseSession();
+  if (!session) {
+    redirect("/login");
+  }
 
-  if (!session?.user?.id) {
+  const professional = await getPrismaClient().professional.findUnique({
+    where: { firebaseUid: session.uid },
+    select: { id: true, expiresAt: true },
+  });
+  if (!professional) {
     redirect("/login");
   }
 
   if (!options.allowExpired) {
-    const professional = await getPrismaClient().professional.findUnique({
-      where: { id: session.user.id },
-      select: { expiresAt: true },
-    });
-
-    if (!professional) {
-      redirect("/login");
-    }
-
     if (professional.expiresAt <= new Date()) {
       await getPrismaClient().professional.updateMany({
         where: {
-          id: session.user.id,
+          id: professional.id,
           subscriptionStatus: { not: "EXPIRED" },
           expiresAt: { lte: new Date() },
         },
@@ -35,5 +44,5 @@ export async function getAuthenticatedProfessionalId(
     }
   }
 
-  return session.user.id;
+  return professional.id;
 }
