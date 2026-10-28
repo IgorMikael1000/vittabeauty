@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { DeleteAccountForm } from "@/components/account/delete-account-form";
 import { SecurityForm } from "@/components/account/security-form";
 
 export const metadata: Metadata = {
@@ -22,12 +23,13 @@ export default function AccountSecurityPage() {
         Segurança e Senha
       </h1>
       <p className="mt-2 text-sm leading-6 text-vitta-muted">
-        Confirme sua senha atual antes de definir uma nova.
+        Gerencie sua senha e as opções permanentes de segurança da conta.
       </p>
 
       <div className="mt-7 rounded-[24px] border border-[#ebe5ef] bg-white/90 p-5 shadow-card sm:p-8">
         <SecurityForm />
       </div>
+      <DeleteAccountForm />
     </section>
   );
 }

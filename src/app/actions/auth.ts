@@ -221,6 +221,9 @@ export async function registerAction(
   const specialtyInput = formData.get("specialty");
   const idToken = formData.get("firebaseIdToken");
   const method = formData.get("authMethod");
+  const acceptedTerms = formData.get("acceptedTerms");
+  const password = formData.get("password");
+  const confirmPassword = formData.get("confirmPassword");
 
   if (
     typeof nameInput !== "string" ||
@@ -232,6 +235,18 @@ export async function registerAction(
     (method !== "password" && method !== "google")
   ) {
     return { error: "Preencha todos os campos e tente novamente." };
+  }
+  if (acceptedTerms !== "true") {
+    return {
+      error:
+        "É necessário aceitar os Termos de Uso e a Política de Privacidade.",
+    };
+  }
+  if (
+    method === "password" &&
+    (typeof password !== "string" || password !== confirmPassword)
+  ) {
+    return { error: "As senhas informadas não coincidem." };
   }
 
   const normalizedName = nameInput.trim().replace(/\s+/g, " ");
@@ -337,20 +352,34 @@ export async function registerAction(
         : { error: sessionResult.error };
     }
 
-    const duplicate = await prisma.professional.findFirst({
-      where: { OR: [{ email }, { cpf }, { firebaseUid: identity.uid }] },
-      select: { email: true, cpf: true },
+    const duplicateEmail = await prisma.professional.findUnique({
+      where: { email },
+      select: { id: true },
     });
-    if (duplicate) {
+    const duplicateCpf = await prisma.professional.findUnique({
+      where: { cpf },
+      select: { id: true },
+    });
+    const duplicatePhone = await prisma.professional.findUnique({
+      where: { phone },
+      select: { id: true },
+    });
+    if (duplicateEmail || duplicateCpf || duplicatePhone) {
+      const duplicateCode = duplicateCpf
+        ? "CPF_EXISTS"
+        : duplicatePhone
+          ? "PHONE_EXISTS"
+          : "EMAIL_EXISTS";
       logAuthEvent("registration.duplicate_profile", {
         outcome: "rejected",
         provider: method,
-        code: duplicate.cpf === cpf ? "CPF_EXISTS" : "EMAIL_EXISTS",
+        code: duplicateCode,
       });
       return {
-        error:
-          duplicate.cpf === cpf
-            ? "Este CPF já está cadastrado."
+        error: duplicateCpf
+          ? "Este CPF já está cadastrado."
+          : duplicatePhone
+            ? "Este telefone já está cadastrado."
             : "Este e-mail já está cadastrado.",
       };
     }
@@ -413,6 +442,10 @@ export async function registerAction(
             where: { cpf },
             select: { id: true },
           });
+          const duplicatePhone = await prisma.professional.findUnique({
+            where: { phone },
+            select: { id: true },
+          });
           if (duplicateCpf) {
             logAuthEvent("registration.duplicate_profile", {
               outcome: "rejected",
@@ -421,6 +454,16 @@ export async function registerAction(
             });
             return {
               error: "Este CPF já está cadastrado.",
+            };
+          }
+          if (duplicatePhone) {
+            logAuthEvent("registration.duplicate_profile", {
+              outcome: "rejected",
+              provider: method,
+              code: "PHONE_EXISTS",
+            });
+            return {
+              error: "Este telefone já está cadastrado.",
             };
           }
           if (duplicateEmail) {

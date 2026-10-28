@@ -127,7 +127,7 @@ export function SecurityForm() {
         if (logResult.error) {
           setUpdateState({
             error:
-              "A senha foi alterada no Firebase, mas não conseguimos registrar a confirmação. Entre novamente se tiver problemas de acesso.",
+              "Sua senha foi alterada, mas não conseguimos confirmar a operação. Entre novamente se tiver problemas de acesso.",
           });
           return;
         }
@@ -150,7 +150,7 @@ export function SecurityForm() {
             code === "auth/requires-recent-login"
               ? "Entre novamente e repita a confirmação da senha atual."
               : code === "auth/weak-password"
-                ? "A nova senha não atende aos requisitos do Firebase."
+                ? "A nova senha não atende aos requisitos de segurança."
                 : "Não foi possível atualizar a senha. Tente novamente.",
         });
       }
@@ -187,6 +187,10 @@ export function SecurityForm() {
 
       {!verified ? (
         <form className="space-y-5" onSubmit={verifyCurrentPassword}>
+          <p className="text-sm leading-6 text-vitta-muted">
+            Confirme sua senha atual para continuar. Depois da confirmação, você
+            poderá definir uma nova senha sem sair do Vitta Beauty.
+          </p>
           <PasswordInput
             autoComplete="current-password"
             id="current-password"
@@ -211,7 +215,8 @@ export function SecurityForm() {
           onSubmit={updatePassword}
         >
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-            Senha atual confirmada. Agora você pode criar uma nova senha.
+            Senha atual confirmada. Informe a nova senha para atualizar sua
+            conta.
           </div>
 
           <PasswordInput

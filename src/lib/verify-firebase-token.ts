@@ -8,6 +8,7 @@ export type FirebaseIdentity = {
   emailVerified: boolean;
   providers: string[];
   photoUrl: string | null;
+  authTime: number;
 };
 
 export type FirebaseTokenValidation = {
@@ -65,6 +66,7 @@ export async function verifyFirebaseIdTokenWithDiagnostics(
   }
 
   const firebase = payload.firebase;
+  const authTime = payload.auth_time;
   if (typeof payload.sub !== "string" || !payload.sub)
     return { identity: null, diagnostic: "FIREBASE_JWT_SUBJECT_MISSING" };
   if (typeof payload.email !== "string" || !payload.email)
@@ -107,6 +109,7 @@ export async function verifyFirebaseIdTokenWithDiagnostics(
       uid: payload.sub,
       email: payload.email.trim().toLowerCase(),
       emailVerified: payload.email_verified,
+      authTime,
       providers: Array.from(
         new Set([firebase.sign_in_provider, ...identities]),
       ),

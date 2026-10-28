@@ -153,7 +153,7 @@ export function ProfessionalDetailsForm({
         setCurrentPassword("");
         setState({
           success:
-            "Enviamos um link de confirmação para o novo endereço. Abra-o neste navegador para atualizar seu perfil e continuar conectado.",
+            `Enviamos um link de confirmação para ${normalizedEmail}. Abra a caixa de entrada desse novo endereço e clique no link. A troca só será concluída após essa confirmação; ao voltar ao Vitta Beauty, seu perfil será atualizado.`,
         });
       } catch (error) {
         console.error("Could not request Firebase email change.", error);
@@ -257,14 +257,16 @@ export function ProfessionalDetailsForm({
               onClick={requestEmailChange}
               type="button"
             >
-              {emailPending ? "Enviando confirmação..." : "Enviar confirmação"}
+              {emailPending
+                ? "Enviando link..."
+                : "Enviar link de confirmação"}
             </button>
           </div>
         )}
         {emailChangeRequested && (
           <p className="mt-2 text-xs leading-5 text-vitta-muted">
-            Aguardando confirmação no novo endereço. Abra o link no mesmo
-            navegador para voltar ao Vitta Beauty já conectado.
+            Aguardando o clique no link enviado para o novo e-mail. A alteração
+            não acontece automaticamente ao solicitar o link.
           </p>
         )}
       </div>

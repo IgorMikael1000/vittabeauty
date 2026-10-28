@@ -21,6 +21,7 @@ import { getFirebaseActionCodeSettings } from "@/lib/firebase-action-settings";
 import { auth, googleProvider } from "@/lib/firebase";
 
 type AuthFormProps = {
+  accountDeletionPending?: boolean;
   registered?: boolean;
   initialEmail?: string;
 };
@@ -57,6 +58,7 @@ function firebaseErrorMessage(error: unknown): string {
 }
 
 export function AuthForm({
+  accountDeletionPending = false,
   registered = false,
   initialEmail = "",
 }: AuthFormProps) {
@@ -247,6 +249,15 @@ export function AuthForm({
           Cadastro realizado! O suporte do Vitta Beauty enviou um e-mail de
           confirmação para você. Por favor, confirme seu e-mail antes de
           realizar o login.
+        </p>
+      )}
+      {accountDeletionPending && (
+        <p
+          className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          role="alert"
+        >
+          A autenticação foi removida, mas a exclusão dos dados não foi
+          concluída. Entre em contato com o suporte para finalizar a solicitação.
         </p>
       )}
       {error && (

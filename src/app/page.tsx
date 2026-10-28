@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
-import { getCurrentProfessionalId } from "@/lib/authenticated-professional";
+import { getFirebaseSession } from "@/lib/firebase-session";
 
 export default async function HomePage() {
-  redirect((await getCurrentProfessionalId()) ? "/dashboard" : "/login");
+  const session = await getFirebaseSession();
+  redirect(session ? "/dashboard" : "/login");
 }

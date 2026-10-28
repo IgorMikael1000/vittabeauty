@@ -37,7 +37,7 @@ model Professional {
   email                String                @unique
   firebaseUid          String?               @unique
   cpf                  String?               @unique
-  phone                String?
+  phone                String?               @unique
   specialty            String?
   pixKey               String?
   logoUrl              String?               @db.Text

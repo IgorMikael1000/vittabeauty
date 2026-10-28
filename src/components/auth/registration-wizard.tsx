@@ -58,6 +58,49 @@ function firebaseErrorMessage(error: unknown): string {
   return "Não foi possível concluir o cadastro. Tente novamente.";
 }
 
+function TermsAcceptance({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex items-start gap-3 rounded-2xl border border-[#e9e3ed] bg-[#fcfbfd] p-4 text-sm leading-6 text-vitta-text">
+      <input
+        checked={checked}
+        className="mt-1 h-4 w-4 shrink-0 accent-[#7950a5]"
+        name="acceptedTerms"
+        onChange={(event) => onChange(event.currentTarget.checked)}
+        required
+        type="checkbox"
+        value="true"
+      />
+      <span>
+        Li e concordo com os{" "}
+        <a
+          className="font-semibold text-vitta underline decoration-vitta/30 underline-offset-4 hover:decoration-vitta"
+          href="/termos-e-politica.txt"
+          rel="noreferrer"
+          target="_blank"
+        >
+          Termos de Uso
+        </a>{" "}
+        e a{" "}
+        <a
+          className="font-semibold text-vitta underline decoration-vitta/30 underline-offset-4 hover:decoration-vitta"
+          href="/termos-e-politica.txt"
+          rel="noreferrer"
+          target="_blank"
+        >
+          Política de Privacidade
+        </a>
+        .
+      </span>
+    </label>
+  );
+}
+
 export function RegistrationWizard({
   initialEmail = "",
   googleRegistration = false,
@@ -77,11 +120,28 @@ export function RegistrationWizard({
   const [nameError, setNameError] = useState("");
   const [cpfError, setCpfError] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [state, formAction, pending] = useActionState(
     async (previousState: FormState, formData: FormData) => {
       const email = String(formData.get("email") ?? "")
         .trim()
         .toLowerCase();
+      const submittedPassword = formData.get("password");
+      const submittedConfirmation = formData.get("confirmPassword");
+      if (formData.get("acceptedTerms") !== "true") {
+        return {
+          error:
+            "Leia e aceite os Termos de Uso e a Política de Privacidade.",
+        };
+      }
+      if (
+        !googleRegistration &&
+        (typeof submittedPassword !== "string" ||
+          submittedPassword !== submittedConfirmation)
+      ) {
+        return { error: "As senhas informadas não coincidem." };
+      }
       let user = auth.currentUser;
 
       try {
@@ -94,14 +154,13 @@ export function RegistrationWizard({
           }
         } else {
           if (!user || user.email?.toLowerCase() !== email) {
-            const rawPassword = formData.get("password");
-            if (typeof rawPassword !== "string") {
+            if (typeof submittedPassword !== "string") {
               return { error: "Informe uma senha válida." };
             }
             const credential = await createUserWithEmailAndPassword(
               auth,
               email,
-              rawPassword,
+              submittedPassword,
             );
             user = credential.user;
           }
@@ -156,6 +215,8 @@ export function RegistrationWizard({
     initialState,
   );
   const passwordRequirements = getPasswordRequirements(password);
+  const passwordsMatch = password === confirmPassword;
+  const passwordMismatch = confirmPassword.length > 0 && !passwordsMatch;
 
   function updateDetail<K extends keyof RegistrationDetails>(
     key: K,
@@ -166,7 +227,11 @@ export function RegistrationWizard({
 
   function validateProfile(event: FormEvent<HTMLFormElement>) {
     if (step === 2 && !googleRegistration) {
-      if (passwordRequirements.some((requirement) => !requirement.met)) {
+      if (
+        passwordRequirements.some((requirement) => !requirement.met) ||
+        !passwordsMatch ||
+        !termsAccepted
+      ) {
         event.preventDefault();
       }
       return;
@@ -184,6 +249,10 @@ export function RegistrationWizard({
       return;
     }
     setCpfError("");
+    if (googleRegistration && !termsAccepted) {
+      event.preventDefault();
+      return;
+    }
     if (!googleRegistration) {
       event.preventDefault();
       setStep(2);
@@ -251,6 +320,23 @@ export function RegistrationWizard({
               onChange={setPassword}
               value={password}
             />
+            <div>
+              <PasswordInput
+                autoComplete="new-password"
+                id="registration-confirm-password"
+                label="Confirmar Senha"
+                maxLength={72}
+                minLength={8}
+                name="confirmPassword"
+                onChange={setConfirmPassword}
+                value={confirmPassword}
+              />
+              {passwordMismatch && (
+                <p className="mt-2 text-xs text-rose-700" role="alert">
+                  As senhas não coincidem. Confira os dois campos.
+                </p>
+              )}
+            </div>
             <ul aria-live="polite" className="grid gap-2 text-xs sm:grid-cols-2">
               {passwordRequirements.map((requirement) => (
                 <li
@@ -264,6 +350,10 @@ export function RegistrationWizard({
                 </li>
               ))}
             </ul>
+            <TermsAcceptance
+              checked={termsAccepted}
+              onChange={setTermsAccepted}
+            />
             {state.error && (
               <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert">
                 {state.error}
@@ -281,14 +371,18 @@ export function RegistrationWizard({
                 className="rounded-2xl bg-gradient-to-r from-[#7950a5] to-[#9368b3] px-5 py-3.5 font-semibold text-white disabled:opacity-60"
                 disabled={
                   pending ||
-                  passwordRequirements.some((requirement) => !requirement.met)
+                  passwordRequirements.some((requirement) => !requirement.met) ||
+                  !passwordsMatch ||
+                  !termsAccepted
                 }
                 formNoValidate
                 onClick={(event) => {
                   if (
                     passwordRequirements.some(
                       (requirement) => !requirement.met,
-                    )
+                    ) ||
+                    !passwordsMatch ||
+                    !termsAccepted
                   ) {
                     event.preventDefault();
                   }
@@ -395,6 +489,12 @@ export function RegistrationWizard({
                 value={details.email}
               />
             </label>
+            {googleRegistration && (
+              <TermsAcceptance
+                checked={termsAccepted}
+                onChange={setTermsAccepted}
+              />
+            )}
             {state.error && (
               <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert">
                 {state.error}
@@ -402,7 +502,7 @@ export function RegistrationWizard({
             )}
             <button
               className="w-full rounded-2xl bg-gradient-to-r from-[#7950a5] to-[#9368b3] px-5 py-3.5 font-semibold text-white disabled:opacity-60"
-              disabled={pending}
+              disabled={pending || (googleRegistration && !termsAccepted)}
               type="submit"
             >
               {pending
