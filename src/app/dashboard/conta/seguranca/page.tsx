@@ -2,12 +2,26 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { DeleteAccountForm } from "@/components/account/delete-account-form";
 import { SecurityForm } from "@/components/account/security-form";
+import { getAuthenticatedProfessionalId } from "@/lib/authenticated-professional";
+import { getPrismaClient } from "@/lib/prisma";
 
 export const metadata: Metadata = {
   title: "Segurança e Senha",
 };
 
-export default function AccountSecurityPage() {
+export default async function AccountSecurityPage() {
+  const professionalId = await getAuthenticatedProfessionalId({
+    allowExpired: true,
+  });
+  const professional = await getPrismaClient().professional.findUniqueOrThrow({
+    where: { id: professionalId },
+    select: {
+      expiresAt: true,
+      subscriptionStatus: true,
+      planType: true,
+    },
+  });
+
   return (
     <section className="mx-auto w-full max-w-3xl">
       <Link
@@ -29,7 +43,12 @@ export default function AccountSecurityPage() {
       <div className="mt-7 rounded-[24px] border border-[#ebe5ef] bg-white/90 p-5 shadow-card sm:p-8">
         <SecurityForm />
       </div>
-      <DeleteAccountForm />
+      <DeleteAccountForm
+        expiresAt={professional.expiresAt}
+        hasActiveAccess={professional.expiresAt > new Date()}
+        planType={professional.planType}
+        subscriptionStatus={professional.subscriptionStatus}
+      />
     </section>
   );
 }

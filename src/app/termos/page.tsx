@@ -133,7 +133,16 @@ function getLegalDocument() {
   return parseLegalDocument(source);
 }
 
-export default function TermsPage() {
+export default async function TermsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ source?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  const source = Array.isArray(params.source) ? params.source[0] : params.source;
+  const fromAccount = source === "account";
+  const backHref = fromAccount ? "/dashboard/conta" : "/cadastro";
+  const backLabel = fromAccount ? "Voltar à minha conta" : "Voltar ao cadastro";
   const document = getLegalDocument();
 
   return (
@@ -150,10 +159,10 @@ export default function TermsPage() {
         <div className="mx-auto max-w-6xl px-5 pb-12 pt-7 sm:px-8 sm:pb-16 sm:pt-9">
           <Link
             className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white/90 transition hover:bg-white/15"
-            href="/cadastro"
+            href={backHref}
           >
             <span aria-hidden="true">←</span>
-            Voltar ao cadastro
+            {backLabel}
           </Link>
 
           <div className="mt-10 max-w-3xl sm:mt-14">
@@ -306,9 +315,9 @@ export default function TermsPage() {
             </p>
             <Link
               className="mt-4 inline-flex items-center justify-center rounded-xl bg-vitta px-5 py-3 text-sm font-semibold text-white transition hover:bg-vitta/90"
-              href="/cadastro"
+              href={backHref}
             >
-              Voltar ao cadastro
+              {backLabel}
             </Link>
           </div>
         </div>
