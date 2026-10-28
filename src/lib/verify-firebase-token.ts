@@ -9,6 +9,11 @@ export type FirebaseIdentity = {
   providers: string[];
 };
 
+export type FirebaseTokenValidation = {
+  identity: FirebaseIdentity | null;
+  diagnostic?: string;
+};
+
 const firebaseJwks = createRemoteJWKSet(
   new URL(
     "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com",
@@ -23,12 +28,19 @@ function getFirebaseProjectId(): string {
   return projectId;
 }
 
-export async function verifyFirebaseIdToken(
+export async function verifyFirebaseIdTokenWithDiagnostics(
   idToken: string,
-): Promise<FirebaseIdentity | null> {
-  if (!idToken || idToken.length > 10_000) return null;
+): Promise<FirebaseTokenValidation> {
+  if (!idToken || idToken.length > 10_000) {
+    return { identity: null, diagnostic: "ID_TOKEN_MISSING_OR_TOO_LARGE" };
+  }
 
-  const projectId = getFirebaseProjectId();
+  let projectId: string;
+  try {
+    projectId = getFirebaseProjectId();
+  } catch {
+    return { identity: null, diagnostic: "FIREBASE_PROJECT_ID_NOT_CONFIGURED" };
+  }
   let payload;
   try {
     ({ payload } = await jwtVerify(idToken, firebaseJwks, {
@@ -38,30 +50,55 @@ export async function verifyFirebaseIdToken(
       requiredClaims: ["sub", "iat", "exp", "auth_time"],
     }));
   } catch (error) {
-    if (error instanceof errors.JOSEError) return null;
+    if (error instanceof errors.JOSEError) {
+      const claim =
+        "claim" in error && typeof error.claim === "string"
+          ? `:${error.claim}`
+          : "";
+      return {
+        identity: null,
+        diagnostic: `FIREBASE_JWT_REJECTED:${error.code}${claim}`,
+      };
+    }
     throw error;
   }
 
   const firebase = payload.firebase;
+  if (typeof payload.sub !== "string" || !payload.sub)
+    return { identity: null, diagnostic: "FIREBASE_JWT_SUBJECT_MISSING" };
+  if (typeof payload.email !== "string" || !payload.email)
+    return { identity: null, diagnostic: "FIREBASE_JWT_EMAIL_MISSING" };
+  if (typeof payload.email_verified !== "boolean")
+    return { identity: null, diagnostic: "FIREBASE_JWT_EMAIL_VERIFIED_MISSING" };
+  if (typeof payload.auth_time !== "number")
+    return { identity: null, diagnostic: "FIREBASE_JWT_AUTH_TIME_MISSING" };
+  if (payload.token_use !== "id")
+    return { identity: null, diagnostic: "FIREBASE_JWT_TOKEN_USE_NOT_ID" };
+  if (typeof firebase !== "object" || firebase === null)
+    return { identity: null, diagnostic: "FIREBASE_CLAIMS_MISSING" };
   if (
-    typeof payload.sub !== "string" ||
-    !payload.sub ||
-    typeof payload.email !== "string" ||
-    typeof payload.email_verified !== "boolean" ||
-    typeof payload.auth_time !== "number" ||
-    payload.token_use !== "id" ||
-    typeof firebase !== "object" ||
-    firebase === null ||
     !("sign_in_provider" in firebase) ||
     typeof firebase.sign_in_provider !== "string"
   ) {
-    return null;
+    return {
+      identity: null,
+      diagnostic: "FIREBASE_SIGN_IN_PROVIDER_MISSING",
+    };
   }
 
   return {
-    uid: payload.sub,
-    email: payload.email.trim().toLowerCase(),
-    emailVerified: payload.email_verified,
-    providers: [firebase.sign_in_provider],
+    identity: {
+      uid: payload.sub,
+      email: payload.email.trim().toLowerCase(),
+      emailVerified: payload.email_verified,
+      providers: [firebase.sign_in_provider],
+    },
   };
+}
+
+export async function verifyFirebaseIdToken(
+  idToken: string,
+): Promise<FirebaseIdentity | null> {
+  const result = await verifyFirebaseIdTokenWithDiagnostics(idToken);
+  return result.identity;
 }

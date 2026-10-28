@@ -3,7 +3,10 @@
 import { Prisma } from "@/generated/prisma/client";
 import { compare } from "bcryptjs";
 import { getCpfDigits, hasValidProfessionalName, isValidCpf } from "@/lib/professional-validation";
-import { verifyFirebaseIdToken } from "@/lib/verify-firebase-token";
+import {
+  verifyFirebaseIdToken,
+  verifyFirebaseIdTokenWithDiagnostics,
+} from "@/lib/verify-firebase-token";
 import {
   clearFirebaseSession,
   createFirebaseSession,
@@ -13,13 +16,33 @@ import { getPrismaClient } from "@/lib/prisma";
 export type FormState = {
   error?: string;
   success?: string;
+  debug?: string;
 };
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+function getSafeErrorCode(error: unknown): string {
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    typeof error.code === "string"
+  ) {
+    return `PRISMA_${error.code}`;
+  }
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string"
+  ) {
+    return error.code.slice(0, 80);
+  }
+  if (error instanceof Error) return error.name.slice(0, 80);
+  return "UNKNOWN_ERROR";
+}
+
 async function createSessionResult(
   idToken: string,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; debug?: string }> {
   try {
     await createFirebaseSession(idToken);
     return { success: true };
@@ -28,6 +51,7 @@ async function createSessionResult(
     return {
       success: false,
       error: "Não foi possível iniciar a sessão. Tente novamente.",
+      debug: `SESSION_CREATION_FAILED:${getSafeErrorCode(error)}`,
     };
   }
 }
@@ -40,90 +64,120 @@ export async function loginWithFirebaseAction(
   googleRegistration?: boolean;
   success?: boolean;
   error?: string;
+  debug?: string;
 }> {
-  let identity;
+  let tokenValidation;
   try {
-    identity = await verifyFirebaseIdToken(idToken);
+    tokenValidation = await verifyFirebaseIdTokenWithDiagnostics(idToken);
   } catch (error) {
     console.error("Firebase sign-in failed.", error);
     return {
       error: "Não foi possível validar sua conta agora. Tente novamente.",
+      debug: `TOKEN_VERIFICATION_EXCEPTION:${getSafeErrorCode(error)}`,
     };
   }
 
+  const identity = tokenValidation.identity;
   if (!identity) {
-    return { error: "Não foi possível validar sua conta. Tente novamente." };
+    console.error(
+      "Firebase sign-in token was rejected.",
+      tokenValidation.diagnostic,
+    );
+    return {
+      error: "Não foi possível validar sua conta. Tente novamente.",
+      debug: tokenValidation.diagnostic ?? "TOKEN_VALIDATION_FAILED",
+    };
   }
 
   const usesGoogleProvider = identity.providers.includes("google.com");
   if (!identity.emailVerified && !usesGoogleProvider) {
-    return { error: "Confirme seu e-mail antes de entrar no Vitta Beauty." };
-  }
-
-  const prisma = getPrismaClient();
-  let professional = await prisma.professional.findUnique({
-    where: { firebaseUid: identity.uid },
-    select: { id: true, email: true, firebaseUid: true },
-  });
-
-  if (professional && professional.email !== identity.email) {
-    const duplicateEmail = await prisma.professional.findUnique({
-      where: { email: identity.email },
-      select: { id: true },
-    });
-    if (duplicateEmail && duplicateEmail.id !== professional.id) {
-      return { error: "Este e-mail já está vinculado a outra conta." };
-    }
-
-    try {
-      professional = await prisma.professional.update({
-        where: { id: professional.id },
-        data: { email: identity.email },
-        select: { id: true, email: true, firebaseUid: true },
-      });
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
-        return { error: "Este e-mail já está vinculado a outra conta." };
-      }
-      throw error;
-    }
-  }
-
-  if (!professional) {
-    professional = await prisma.professional.findUnique({
-      where: { email: identity.email },
-      select: { id: true, email: true, firebaseUid: true },
-    });
-  }
-
-  if (!professional) {
     return {
-      registrationRequired: true,
-      email: identity.email,
-      googleRegistration: identity.providers.includes("google.com"),
+      error: "Confirme seu e-mail antes de entrar no Vitta Beauty.",
+      debug: `EMAIL_NOT_VERIFIED:${identity.providers[0] ?? "UNKNOWN_PROVIDER"}`,
     };
   }
 
-  if (professional.firebaseUid && professional.firebaseUid !== identity.uid) {
-    return { error: "Este e-mail já está vinculado a outra conta Firebase." };
-  }
-
-  if (!professional.firebaseUid) {
-    await prisma.professional.update({
-      where: { id: professional.id },
-      data: { firebaseUid: identity.uid, passwordHash: null },
+  try {
+    const prisma = getPrismaClient();
+    let professional = await prisma.professional.findUnique({
+      where: { firebaseUid: identity.uid },
+      select: { id: true, email: true, firebaseUid: true },
     });
-  } else {
-    await prisma.professional.updateMany({
-      where: { id: professional.id, firebaseUid: identity.uid },
-      data: { passwordHash: null },
-    });
-  }
 
-  return createSessionResult(idToken);
+    if (professional && professional.email !== identity.email) {
+      const duplicateEmail = await prisma.professional.findUnique({
+        where: { email: identity.email },
+        select: { id: true },
+      });
+      if (duplicateEmail && duplicateEmail.id !== professional.id) {
+        return {
+          error: "Este e-mail já está vinculado a outra conta.",
+          debug: "PRISMA_EMAIL_ALREADY_LINKED_TO_DIFFERENT_PROFILE",
+        };
+      }
+
+      try {
+        professional = await prisma.professional.update({
+          where: { id: professional.id },
+          data: { email: identity.email },
+          select: { id: true, email: true, firebaseUid: true },
+        });
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002"
+        ) {
+          return {
+            error: "Este e-mail já está vinculado a outra conta.",
+            debug: "PRISMA_P2002_EMAIL_ALREADY_LINKED",
+          };
+        }
+        throw error;
+      }
+    }
+
+    if (!professional) {
+      professional = await prisma.professional.findUnique({
+        where: { email: identity.email },
+        select: { id: true, email: true, firebaseUid: true },
+      });
+    }
+
+    if (!professional) {
+      return {
+        registrationRequired: true,
+        email: identity.email,
+        googleRegistration: identity.providers.includes("google.com"),
+      };
+    }
+
+    if (professional.firebaseUid && professional.firebaseUid !== identity.uid) {
+      return {
+        error: "Este e-mail já está vinculado a outra conta Firebase.",
+        debug: "PRISMA_PROFILE_LINKED_TO_DIFFERENT_FIREBASE_UID",
+      };
+    }
+
+    if (!professional.firebaseUid) {
+      await prisma.professional.update({
+        where: { id: professional.id },
+        data: { firebaseUid: identity.uid, passwordHash: null },
+      });
+    } else {
+      await prisma.professional.updateMany({
+        where: { id: professional.id, firebaseUid: identity.uid },
+        data: { passwordHash: null },
+      });
+    }
+
+    return createSessionResult(idToken);
+  } catch (error) {
+    console.error("Firebase sign-in database lookup failed.", error);
+    return {
+      error: "Não foi possível consultar seu cadastro. Tente novamente.",
+      debug: `LOGIN_DATABASE_OPERATION_FAILED:${getSafeErrorCode(error)}`,
+    };
+  }
 }
 
 export async function registerAction(
@@ -176,120 +230,166 @@ export async function registerAction(
     return { error: "Informe sua especialidade (de 2 a 80 caracteres)." };
   }
 
-  let identity;
+  let tokenValidation;
   try {
-    identity = await verifyFirebaseIdToken(idToken);
+    tokenValidation = await verifyFirebaseIdTokenWithDiagnostics(idToken);
   } catch (error) {
     console.error("Firebase registration token verification failed.", error);
-    return { error: "Não foi possível validar sua conta. Tente novamente." };
+    return {
+      error: "Não foi possível validar sua conta. Tente novamente.",
+      debug: `TOKEN_VERIFICATION_EXCEPTION:${getSafeErrorCode(error)}`,
+    };
+  }
+
+  const identity = tokenValidation.identity;
+  if (!identity) {
+    console.error(
+      "Firebase registration token was rejected.",
+      tokenValidation.diagnostic,
+    );
+    return {
+      error: "Não foi possível validar sua conta. Tente novamente.",
+      debug: tokenValidation.diagnostic ?? "TOKEN_VALIDATION_FAILED",
+    };
   }
 
   if (
-    !identity ||
     identity.email !== email ||
     (method === "google" &&
       !identity.providers.includes("google.com")) ||
     (method === "password" && !identity.providers.includes("password"))
   ) {
-    return { error: "A autenticação Firebase não corresponde a este cadastro." };
-  }
-
-  const prisma = getPrismaClient();
-  const existingByUid = await prisma.professional.findUnique({
-    where: { firebaseUid: identity.uid },
-    select: { id: true, email: true },
-  });
-  if (existingByUid) {
-    if (
-      method !== "google" ||
-      existingByUid.email !== email ||
-      identity.email !== email
-    ) {
-      return { error: "Esta conta Firebase já possui um cadastro." };
-    }
-    const sessionResult = await createSessionResult(idToken);
-    return sessionResult.success
-      ? { success: "Cadastro realizado." }
-      : { error: sessionResult.error };
-  }
-
-  const duplicate = await prisma.professional.findFirst({
-    where: { OR: [{ email }, { cpf }, { firebaseUid: identity.uid }] },
-    select: { email: true, cpf: true },
-  });
-  if (duplicate) {
     return {
-      error:
-        duplicate.cpf === cpf
-          ? "Este CPF já está cadastrado."
-          : "Este e-mail já está cadastrado.",
+      error: "A autenticação Firebase não corresponde a este cadastro.",
+      debug: `REGISTRATION_IDENTITY_MISMATCH:method=${method}:provider=${identity.providers[0] ?? "UNKNOWN"}:email_match=${identity.email === email}`,
     };
   }
 
-  const slugBase =
-    normalizedName
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "")
-      .slice(0, 48) || "profissional";
-
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    const slug = `${slugBase}-${crypto.randomUUID().slice(0, 8)}`;
-    try {
-      await prisma.professional.create({
-        data: {
-          name: normalizedName,
-          email,
-          firebaseUid: identity.uid,
-          cpf,
-          phone,
-          specialty,
-          slug,
-          subscriptionStatus: "TRIAL",
-          planType: "FREE",
-          expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-        },
-      });
-
-      if (method === "google") {
-        const sessionResult = await createSessionResult(idToken);
-        if (!sessionResult.success) {
-          return { error: sessionResult.error };
-        }
-      }
-
-      return { success: "Cadastro realizado." };
-    } catch (error) {
-      console.error(
-        "Prisma Professional.create failed while registering a Firebase user.",
-        error,
-      );
+  try {
+    const prisma = getPrismaClient();
+    const existingByUid = await prisma.professional.findUnique({
+      where: { firebaseUid: identity.uid },
+      select: { id: true, email: true },
+    });
+    if (existingByUid) {
       if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
+        method !== "google" ||
+        existingByUid.email !== email ||
+        identity.email !== email
       ) {
-        const duplicateEmail = await prisma.professional.findUnique({
-          where: { email },
-          select: { id: true },
-        });
-        const duplicateCpf = await prisma.professional.findUnique({
-          where: { cpf },
-          select: { id: true },
-        });
-        if (duplicateCpf) return { error: "Este CPF já está cadastrado." };
-        if (duplicateEmail) return { error: "Este e-mail já está cadastrado." };
-        continue;
+        return {
+          error: "Esta conta Firebase já possui um cadastro.",
+          debug: "PRISMA_FIREBASE_UID_ALREADY_REGISTERED",
+        };
       }
+      const sessionResult = await createSessionResult(idToken);
+      return sessionResult.success
+        ? { success: "Cadastro realizado." }
+        : { error: sessionResult.error, debug: sessionResult.debug };
+    }
+
+    const duplicate = await prisma.professional.findFirst({
+      where: { OR: [{ email }, { cpf }, { firebaseUid: identity.uid }] },
+      select: { email: true, cpf: true },
+    });
+    if (duplicate) {
       return {
         error:
-          "Não foi possível salvar seu cadastro agora. Tente novamente em instantes.",
+          duplicate.cpf === cpf
+            ? "Este CPF já está cadastrado."
+            : "Este e-mail já está cadastrado.",
+        debug:
+          duplicate.cpf === cpf
+            ? "PRISMA_CPF_ALREADY_REGISTERED"
+            : "PRISMA_EMAIL_ALREADY_REGISTERED",
       };
     }
-  }
 
-  return { error: "Não foi possível gerar um link exclusivo. Tente novamente." };
+    const slugBase =
+      normalizedName
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 48) || "profissional";
+
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const slug = `${slugBase}-${crypto.randomUUID().slice(0, 8)}`;
+      try {
+        await prisma.professional.create({
+          data: {
+            name: normalizedName,
+            email,
+            firebaseUid: identity.uid,
+            cpf,
+            phone,
+            specialty,
+            slug,
+            subscriptionStatus: "TRIAL",
+            planType: "FREE",
+            expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+          },
+        });
+
+        if (method === "google") {
+          const sessionResult = await createSessionResult(idToken);
+          if (!sessionResult.success) {
+            return { error: sessionResult.error, debug: sessionResult.debug };
+          }
+        }
+
+        return { success: "Cadastro realizado." };
+      } catch (error) {
+        console.error(
+          "Prisma Professional.create failed while registering a Firebase user.",
+          error,
+        );
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002"
+        ) {
+          const duplicateEmail = await prisma.professional.findUnique({
+            where: { email },
+            select: { id: true },
+          });
+          const duplicateCpf = await prisma.professional.findUnique({
+            where: { cpf },
+            select: { id: true },
+          });
+          if (duplicateCpf) {
+            return {
+              error: "Este CPF já está cadastrado.",
+              debug: "PRISMA_CPF_ALREADY_REGISTERED",
+            };
+          }
+          if (duplicateEmail) {
+            return {
+              error: "Este e-mail já está cadastrado.",
+              debug: "PRISMA_EMAIL_ALREADY_REGISTERED",
+            };
+          }
+          continue;
+        }
+        return {
+          error:
+            "Não foi possível salvar seu cadastro agora. Tente novamente em instantes.",
+          debug: `PRISMA_PROFESSIONAL_CREATE_FAILED:${getSafeErrorCode(error)}`,
+        };
+      }
+    }
+
+    return {
+      error: "Não foi possível gerar um link exclusivo. Tente novamente.",
+      debug: "PRISMA_SLUG_RETRIES_EXHAUSTED",
+    };
+  } catch (error) {
+    console.error("Firebase registration database operation failed.", error);
+    return {
+      error: "Não foi possível consultar ou salvar seu cadastro.",
+      debug: `REGISTRATION_DATABASE_OPERATION_FAILED:${getSafeErrorCode(error)}`,
+    };
+  }
 }
 
 export async function verifyLegacyCredentialsAction(
