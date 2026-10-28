@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import type { FormState } from "@/app/actions/auth";
 import { getAuthenticatedProfessionalId } from "@/lib/authenticated-professional";
 import { hasValidProfessionalName } from "@/lib/professional-validation";
-import { verifyFirebaseIdToken } from "@/lib/firebase-id-token";
+import { verifyFirebaseIdToken } from "@/lib/verify-firebase-token";
 import { getPrismaClient } from "@/lib/prisma";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

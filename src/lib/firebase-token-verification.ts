@@ -1,54 +1,65 @@
 import "server-only";
 
-import type { DecodedIdToken } from "firebase-admin/auth";
-import { getFirebaseAdminAuth } from "@/lib/firebase-admin";
+import { errors, jwtVerify } from "jose";
 
 export const FIREBASE_SESSION_COOKIE = "vitta_session";
 export const FIREBASE_SESSION_MAX_AGE_SECONDS = 5 * 24 * 60 * 60;
 
-const invalidFirebaseTokenCodes = new Set([
-  "auth/argument-error",
-  "auth/id-token-expired",
-  "auth/id-token-revoked",
-  "auth/invalid-credential",
-  "auth/invalid-id-token",
-  "auth/invalid-session-cookie",
-  "auth/session-cookie-expired",
-  "auth/session-cookie-revoked",
-]);
+const sessionIssuer = "vitta-beauty";
+const sessionAudience = "vitta-dashboard";
 
-export function isInvalidFirebaseTokenError(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    typeof error.code === "string" &&
-    invalidFirebaseTokenCodes.has(error.code)
-  );
+export type FirebaseSessionClaims = {
+  uid: string;
+  email: string;
+  email_verified: true;
+  firebase: { sign_in_provider: string };
+};
+
+function getSessionSecret(): Uint8Array {
+  const secret = process.env.AUTH_SESSION_SECRET;
+  if (!secret || new TextEncoder().encode(secret).byteLength < 32) {
+    throw new Error("AUTH_SESSION_SECRET must contain at least 32 bytes.");
+  }
+  return new TextEncoder().encode(secret);
 }
 
 export async function verifyFirebaseSessionCookie(
   sessionCookie: string,
-): Promise<DecodedIdToken | null> {
+): Promise<FirebaseSessionClaims | null> {
   if (!sessionCookie || sessionCookie.length > 10_000) return null;
 
+  let payload;
   try {
-    return await getFirebaseAdminAuth().verifySessionCookie(sessionCookie, true);
+    ({ payload } = await jwtVerify(sessionCookie, getSessionSecret(), {
+      algorithms: ["HS256"],
+      audience: sessionAudience,
+      issuer: sessionIssuer,
+      requiredClaims: ["sub", "iat", "exp"],
+    }));
   } catch (error) {
-    if (isInvalidFirebaseTokenError(error)) return null;
+    if (error instanceof errors.JOSEError) return null;
     throw error;
   }
-}
 
-export async function verifyFirebaseIdTokenClaims(
-  idToken: string,
-): Promise<DecodedIdToken | null> {
-  if (!idToken || idToken.length > 10_000) return null;
-
-  try {
-    return await getFirebaseAdminAuth().verifyIdToken(idToken, true);
-  } catch (error) {
-    if (isInvalidFirebaseTokenError(error)) return null;
-    throw error;
+  const firebase = payload.firebase;
+  if (
+    typeof payload.uid !== "string" ||
+    !payload.uid ||
+    payload.sub !== payload.uid ||
+    typeof payload.email !== "string" ||
+    payload.email_verified !== true ||
+    typeof firebase !== "object" ||
+    firebase === null ||
+    !("sign_in_provider" in firebase) ||
+    typeof firebase.sign_in_provider !== "string"
+  ) {
+    return null;
   }
+
+  return {
+    uid: payload.uid,
+    email: payload.email,
+    email_verified: true,
+    firebase: { sign_in_provider: firebase.sign_in_provider },
+  };
 }

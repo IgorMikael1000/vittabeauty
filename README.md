@@ -27,13 +27,11 @@ I&T Solutions com Next.js, TypeScript, Tailwind CSS, Prisma e PostgreSQL na Neon
 3. Configure `DATABASE_URL` com a connection string pooled da Neon,
    `DIRECT_URL` com a connection string direta, `NEXT_PUBLIC_APP_URL` com a
    origem local, as seis variáveis `NEXT_PUBLIC_FIREBASE_*` com a configuração
-   do app Web e `FIREBASE_SERVICE_ACCOUNT_JSON` com o JSON de uma conta de
-   serviço Firebase. No Firebase Console, habilite os provedores E-mail/senha e
-   Google e configure os domínios autorizados para desenvolvimento e produção.
-   O JSON deve vir de uma conta de serviço do mesmo projeto Firebase; mantenha-o
-   somente no servidor e nunca use o prefixo `NEXT_PUBLIC_` nessa variável.
-   Configure o JSON completo como um único valor de ambiente; não publique nem
-   versione a chave privada.
+   do app Web e `AUTH_SESSION_SECRET` com um segredo aleatório de pelo menos
+   32 bytes. Gere um com `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`
+   e configure-o somente no servidor. No Firebase Console, habilite os provedores
+   E-mail/senha e Google e configure os domínios autorizados para desenvolvimento
+   e produção.
 
 4. Crie as tabelas no banco:
 
@@ -152,9 +150,13 @@ apagar os valores existentes nela.
   política de referência e permissões de recursos. HSTS é habilitado em
   produção; o link público exige `NEXT_PUBLIC_APP_URL` com HTTPS nesse ambiente.
 - A autenticação de usuários e a verificação de e-mail são gerenciadas pelo
-  Firebase Authentication. O Firebase Admin valida ID tokens e cria cookies de
-  sessão HTTP-only, Secure em produção e SameSite=Lax. O Proxy do Next.js e as
-  páginas/ações protegidas validam esses cookies no servidor.
+  Firebase Authentication. O servidor valida ID tokens pelas chaves públicas
+  oficiais do Firebase e cria cookies de sessão assinados com
+  `AUTH_SESSION_SECRET`, HTTP-only, Secure em produção e SameSite=Lax. O Proxy
+  do Next.js e as páginas/ações protegidas validam esses cookies no servidor.
+  As sessões duram cinco dias; a revogação de tokens no Firebase não invalida
+  automaticamente uma sessão já emitida. O logout limpa o cookie atual e a
+  rotação de `AUTH_SESSION_SECRET` invalida todas as sessões.
 - Configure também limites de requisição no provedor de borda para login,
   cadastro e envio de solicitações públicas antes da exposição à internet.
 - O trial profissional dura três dias a partir do cadastro. Após o vencimento,
@@ -176,9 +178,8 @@ variáveis no projeto antes do primeiro deploy:
 
 - `DATABASE_URL`: connection string pooled da Neon.
 - `DIRECT_URL`: connection string direta da Neon para operações do Prisma CLI.
-- `FIREBASE_SERVICE_ACCOUNT_JSON`: JSON de credenciais da conta de serviço do
-  mesmo projeto Firebase. É confidencial e deve ser configurado somente como
-  variável de ambiente server-side.
+- `AUTH_SESSION_SECRET`: segredo aleatório de pelo menos 32 bytes, configurado
+  somente no servidor.
 - `NEXT_PUBLIC_APP_URL`: origem pública HTTPS, por exemplo
   `https://seu-dominio.com`.
 - `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`,

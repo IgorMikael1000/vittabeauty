@@ -3,7 +3,7 @@
 import { Prisma } from "@/generated/prisma/client";
 import { compare } from "bcryptjs";
 import { getCpfDigits, hasValidProfessionalName, isValidCpf } from "@/lib/professional-validation";
-import { verifyFirebaseIdToken } from "@/lib/firebase-id-token";
+import { verifyFirebaseIdToken } from "@/lib/verify-firebase-token";
 import {
   clearFirebaseSession,
   createFirebaseSession,
