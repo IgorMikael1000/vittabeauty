@@ -26,8 +26,11 @@ I&T Solutions com Next.js, TypeScript, Tailwind CSS, Prisma e PostgreSQL na Neon
 
 3. Configure `DATABASE_URL` com a connection string pooled da Neon,
    `DIRECT_URL` com a connection string direta, `AUTH_SECRET` com um segredo
-   aleatório e `NEXT_PUBLIC_APP_URL` com a origem local da aplicação. O segredo
-   pode ser gerado com `npx auth secret`.
+   aleatório, `NEXT_PUBLIC_APP_URL` com a origem local e as seis variáveis
+   `NEXT_PUBLIC_FIREBASE_*` com a configuração do app Web do Firebase. No
+   Firebase Console, habilite os provedores E-mail/senha e Google e configure
+   os domínios autorizados para desenvolvimento e produção. O segredo pode ser
+   gerado com `npx auth secret`.
 
 4. Crie as tabelas no banco:
 
@@ -41,7 +44,7 @@ I&T Solutions com Next.js, TypeScript, Tailwind CSS, Prisma e PostgreSQL na Neon
    npm run dev
    ```
 
-   Acesse `http://localhost:3000/register` para criar uma conta.
+   Acesse `http://localhost:3000/cadastro` para criar uma conta.
 
 ## Comandos
 
@@ -147,7 +150,9 @@ apagar os valores existentes nela.
 - A aplicação configura `X-Content-Type-Options`, proteção contra framing,
   política de referência e permissões de recursos. HSTS é habilitado em
   produção; o link público exige `NEXT_PUBLIC_APP_URL` com HTTPS nesse ambiente.
-- Senhas bcrypt são limitadas a 72 bytes tanto no cadastro quanto no login.
+- A autenticação de usuários e a verificação de e-mail são gerenciadas pelo
+  Firebase Authentication. O NextAuth mantém a sessão local da aplicação após
+  validar o ID token do Firebase no servidor.
 - Configure também limites de requisição no provedor de borda para login,
   cadastro e envio de solicitações públicas antes da exposição à internet.
 - O trial profissional dura três dias a partir do cadastro. Após o vencimento,
@@ -172,6 +177,10 @@ variáveis no projeto antes do primeiro deploy:
 - `AUTH_SECRET`: segredo aleatório forte e exclusivo de produção.
 - `NEXT_PUBLIC_APP_URL`: origem pública HTTPS, por exemplo
   `https://seu-dominio.com`.
+- `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`,
+  `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`,
+  `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` e `NEXT_PUBLIC_FIREBASE_APP_ID`:
+  configuração pública do app Web Firebase usado pelo Authentication.
 - `MERCADOPAGO_ACCESS_TOKEN`: token de acesso de produção do Mercado Pago.
 - `MERCADOPAGO_WEBHOOK_SECRET`: segredo de assinatura dos webhooks do Mercado
   Pago.

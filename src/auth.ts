@@ -1,6 +1,6 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { compare } from "bcryptjs";
+import { verifyFirebaseIdToken } from "@/lib/firebase-id-token";
 import { getPrismaClient } from "@/lib/prisma";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -13,27 +13,45 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     Credentials({
       credentials: {
-        email: { label: "E-mail", type: "email" },
-        password: { label: "Senha", type: "password" },
+        idToken: { label: "Firebase ID token", type: "text" },
       },
       async authorize(credentials) {
-        if (
-          typeof credentials?.email !== "string" ||
-          typeof credentials.password !== "string"
-        ) {
+        if (typeof credentials?.idToken !== "string") {
           return null;
         }
 
-        const email = credentials.email.trim().toLowerCase();
-        const professional = await getPrismaClient().professional.findUnique({
-          where: { email },
-        });
+        const identity = await verifyFirebaseIdToken(credentials.idToken);
+        if (!identity?.emailVerified) {
+          return null;
+        }
 
+        const prisma = getPrismaClient();
+        let professional = await prisma.professional.findUnique({
+          where: { firebaseUid: identity.uid },
+        });
+        if (!professional) {
+          professional = await prisma.professional.findUnique({
+            where: { email: identity.email },
+          });
+        }
         if (
           !professional ||
-          !(await compare(credentials.password, professional.passwordHash))
+          professional.email !== identity.email ||
+          (professional.firebaseUid !== null &&
+            professional.firebaseUid !== identity.uid)
         ) {
           return null;
+        }
+        if (!professional.firebaseUid) {
+          await prisma.professional.update({
+            where: { id: professional.id },
+            data: { firebaseUid: identity.uid, passwordHash: null },
+          });
+        } else {
+          await prisma.professional.updateMany({
+            where: { id: professional.id, firebaseUid: identity.uid },
+            data: { passwordHash: null },
+          });
         }
 
         return {

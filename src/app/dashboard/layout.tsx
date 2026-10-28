@@ -3,8 +3,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { HelpCircle, LogOut } from "lucide-react";
-import { logoutAction } from "@/app/actions/auth";
 import { auth } from "@/auth";
+import { LogoutButton } from "@/components/auth/logout-button";
 import { DashboardNavigation } from "@/components/dashboard/dashboard-navigation";
 import { WelcomeTour } from "@/components/onboarding/welcome-tour";
 import { PlanCards } from "@/components/subscription/plan-cards";
@@ -143,16 +143,10 @@ export default async function DashboardLayout({
                 professional.name.slice(0, 1).toLocaleUpperCase("pt-BR")
               )}
             </Link>
-            <form action={logoutAction}>
-              <button
-                aria-label="Sair"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#e8e0ec] bg-white/80 p-2 text-xs font-semibold text-vitta-text/75 transition hover:border-vitta/30 hover:bg-white hover:text-vitta md:h-auto md:w-auto md:gap-1.5 md:px-3.5 md:py-2"
-                type="submit"
-              >
-                <LogOut aria-hidden="true" className="h-4 w-4" />
-                <span className="hidden md:inline-block">Sair</span>
-              </button>
-            </form>
+            <LogoutButton className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#e8e0ec] bg-white/80 p-2 text-xs font-semibold text-vitta-text/75 transition hover:border-vitta/30 hover:bg-white hover:text-vitta md:h-auto md:w-auto md:gap-1.5 md:px-3.5 md:py-2">
+              <LogOut aria-hidden="true" className="h-4 w-4" />
+              <span className="hidden md:inline-block">Sair</span>
+            </LogoutButton>
             <Link
               aria-label="Me ajude"
               className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-vitta p-2 text-xs font-semibold text-white transition hover:bg-vitta/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vitta focus-visible:ring-offset-2 md:h-auto md:w-auto md:gap-1.5 md:px-3.5 md:py-2"
@@ -196,14 +190,11 @@ export default async function DashboardLayout({
             <div className="mt-7 overflow-x-auto pb-2">
               <PlanCards horizontal />
             </div>
-            <form action={logoutAction} className="mt-5 text-center">
-              <button
-                className="text-sm font-medium text-vitta-muted underline underline-offset-4 hover:text-vitta"
-                type="submit"
-              >
+            <div className="mt-5 text-center">
+              <LogoutButton className="text-sm font-medium text-vitta-muted underline underline-offset-4 hover:text-vitta">
                 Sair da conta
-              </button>
-            </form>
+              </LogoutButton>
+            </div>
           </section>
         </div>
       )}

@@ -2,16 +2,11 @@
 
 import { Prisma } from "@/generated/prisma/client";
 import { AuthError } from "next-auth";
-import { redirect } from "next/navigation";
-import { hash } from "bcryptjs";
+import { compare } from "bcryptjs";
 import { signIn, signOut } from "@/auth";
+import { getCpfDigits, hasValidProfessionalName, isValidCpf } from "@/lib/professional-validation";
+import { verifyFirebaseIdToken } from "@/lib/firebase-id-token";
 import { getPrismaClient } from "@/lib/prisma";
-import {
-  getCpfDigits,
-  getPasswordRequirements,
-  hasValidProfessionalName,
-  isValidCpf,
-} from "@/lib/professional-validation";
 
 export type FormState = {
   error?: string;
@@ -20,35 +15,91 @@ export type FormState = {
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export async function loginAction(
-  _previousState: FormState,
-  formData: FormData,
-): Promise<FormState> {
-  const email = formData.get("email");
-  const password = formData.get("password");
-
-  if (typeof email !== "string" || typeof password !== "string") {
-    return { error: "Informe seu e-mail e sua senha." };
+export async function loginWithFirebaseAction(
+  idToken: string,
+): Promise<{ registrationRequired?: boolean; email?: string; error?: string }> {
+  let identity;
+  try {
+    identity = await verifyFirebaseIdToken(idToken);
+  } catch (error) {
+    console.error("Firebase sign-in failed.", error);
+    return {
+      error: "Não foi possível validar sua conta agora. Tente novamente.",
+    };
   }
 
-  if (
-    email.length > 254 ||
-    new TextEncoder().encode(password).length > 72
-  ) {
-    return { error: "E-mail ou senha inválidos." };
+  if (!identity || !identity.emailVerified) {
+    return { error: "Confirme seu e-mail antes de entrar no Vitta Beauty." };
+  }
+
+  const prisma = getPrismaClient();
+  let professional = await prisma.professional.findUnique({
+    where: { firebaseUid: identity.uid },
+    select: { id: true, email: true, firebaseUid: true },
+  });
+
+  if (professional && professional.email !== identity.email) {
+    const duplicateEmail = await prisma.professional.findUnique({
+      where: { email: identity.email },
+      select: { id: true },
+    });
+    if (duplicateEmail && duplicateEmail.id !== professional.id) {
+      return { error: "Este e-mail já está vinculado a outra conta." };
+    }
+
+    try {
+      professional = await prisma.professional.update({
+        where: { id: professional.id },
+        data: { email: identity.email },
+        select: { id: true, email: true, firebaseUid: true },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        return { error: "Este e-mail já está vinculado a outra conta." };
+      }
+      throw error;
+    }
+  }
+
+  if (!professional) {
+    professional = await prisma.professional.findUnique({
+      where: { email: identity.email },
+      select: { id: true, email: true, firebaseUid: true },
+    });
+  }
+
+  if (!professional) {
+    return { registrationRequired: true, email: identity.email };
+  }
+
+  if (professional.firebaseUid && professional.firebaseUid !== identity.uid) {
+    return { error: "Este e-mail já está vinculado a outra conta Firebase." };
+  }
+
+  if (!professional.firebaseUid) {
+    await prisma.professional.update({
+      where: { id: professional.id },
+      data: { firebaseUid: identity.uid, passwordHash: null },
+    });
+  } else {
+    await prisma.professional.updateMany({
+      where: { id: professional.id, firebaseUid: identity.uid },
+      data: { passwordHash: null },
+    });
   }
 
   try {
-    await signIn("credentials", {
-      email: email.trim().toLowerCase(),
-      password,
+    await signIn("firebase", {
+      idToken,
       redirectTo: "/dashboard",
     });
   } catch (error) {
     if (error instanceof AuthError) {
-      return { error: "E-mail ou senha inválidos." };
+      return { error: "Não foi possível iniciar a sessão. Tente novamente." };
     }
-
     throw error;
   }
 
@@ -59,91 +110,81 @@ export async function registerAction(
   _previousState: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const name = formData.get("name");
+  const nameInput = formData.get("name");
   const emailInput = formData.get("email");
-  const password = formData.get("password");
   const cpfInput = formData.get("cpf");
   const phoneInput = formData.get("phone");
   const specialtyInput = formData.get("specialty");
+  const idToken = formData.get("firebaseIdToken");
+  const method = formData.get("authMethod");
 
   if (
-    typeof name !== "string" ||
+    typeof nameInput !== "string" ||
     typeof emailInput !== "string" ||
-    typeof password !== "string" ||
     typeof cpfInput !== "string" ||
     typeof phoneInput !== "string" ||
-    typeof specialtyInput !== "string"
+    typeof specialtyInput !== "string" ||
+    typeof idToken !== "string" ||
+    (method !== "password" && method !== "google")
   ) {
-    return { error: "Preencha todos os campos." };
+    return { error: "Preencha todos os campos e tente novamente." };
   }
 
-  const normalizedName = name.trim();
+  const normalizedName = nameInput.trim().replace(/\s+/g, " ");
   const email = emailInput.trim().toLowerCase();
   const cpf = getCpfDigits(cpfInput);
   const phone = phoneInput.replace(/\D/g, "");
   const specialty = specialtyInput.trim();
-  const passwordBytes = new TextEncoder().encode(password).length;
 
-  if (normalizedName.length < 2 || normalizedName.length > 80) {
-    return { error: "O nome deve ter entre 2 e 80 caracteres." };
+  if (
+    normalizedName.length < 2 ||
+    normalizedName.length > 80 ||
+    !hasValidProfessionalName(normalizedName)
+  ) {
+    return { error: "Informe seu nome e sobrenome ou o nome do negócio." };
   }
-
-  if (!hasValidProfessionalName(normalizedName)) {
-    return { error: "Informe seu nome e sobrenome." };
-  }
-
   if (email.length > 254 || !emailPattern.test(email)) {
     return { error: "Informe um e-mail válido." };
   }
-
   if (!isValidCpf(cpf)) {
     return { error: "Informe um CPF válido." };
   }
-
   if (phone.length < 10 || phone.length > 11) {
     return { error: "Informe um telefone com DDD e 10 ou 11 dígitos." };
   }
-
   if (specialty.length < 2 || specialty.length > 80) {
     return { error: "Informe sua especialidade (de 2 a 80 caracteres)." };
   }
 
-  const unmetPasswordRequirements = getPasswordRequirements(password).filter(
-    (requirement) => !requirement.met,
-  );
-  if (unmetPasswordRequirements.length > 0 || passwordBytes > 72) {
-    return {
-      error:
-        passwordBytes > 72
-          ? "A senha deve ter no máximo 72 bytes."
-          : "A senha precisa cumprir todos os requisitos exibidos.",
-    };
+  let identity;
+  try {
+    identity = await verifyFirebaseIdToken(idToken);
+  } catch (error) {
+    console.error("Firebase registration token verification failed.", error);
+    return { error: "Não foi possível validar sua conta. Tente novamente." };
+  }
+
+  if (
+    !identity ||
+    identity.email !== email ||
+    (method === "google" &&
+      (!identity.emailVerified || !identity.providers.includes("google.com"))) ||
+    (method === "password" && !identity.providers.includes("password"))
+  ) {
+    return { error: "A autenticação Firebase não corresponde a este cadastro." };
   }
 
   const prisma = getPrismaClient();
-  const existingProfessional = await prisma.professional.findFirst({
-    where: { OR: [{ email }, { cpf }] },
-    select: { id: true },
+  const duplicate = await prisma.professional.findFirst({
+    where: { OR: [{ email }, { cpf }, { firebaseUid: identity.uid }] },
+    select: { email: true, cpf: true },
   });
-
-  if (existingProfessional) {
-    const [existingEmail, existingCpf] = await Promise.all([
-      prisma.professional.findUnique({
-        where: { email },
-        select: { id: true },
-      }),
-      prisma.professional.findUnique({
-        where: { cpf },
-        select: { id: true },
-      }),
-    ]);
-
+  if (duplicate) {
     return {
-      error: existingCpf
-        ? "Este CPF já está cadastrado."
-        : existingEmail
-          ? "Este e-mail já está cadastrado."
-          : "Já existe um cadastro com estes dados.",
+      error:
+        duplicate.cpf === cpf
+          ? "Este CPF já está cadastrado."
+          : "Este e-mail já está cadastrado.",
     };
   }
 
@@ -155,20 +196,18 @@ export async function registerAction(
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "")
       .slice(0, 48) || "profissional";
-  const passwordHash = await hash(password, 12);
 
   for (let attempt = 0; attempt < 4; attempt += 1) {
     const slug = `${slugBase}-${crypto.randomUUID().slice(0, 8)}`;
-
     try {
       await prisma.professional.create({
         data: {
           name: normalizedName,
           email,
+          firebaseUid: identity.uid,
           cpf,
           phone,
           specialty,
-          passwordHash,
           slug,
           subscriptionStatus: "TRIAL",
           planType: "FREE",
@@ -176,7 +215,7 @@ export async function registerAction(
         },
       });
 
-      redirect(`/login?registered=1&email=${encodeURIComponent(email)}`);
+      return { success: "Cadastro realizado." };
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -190,22 +229,83 @@ export async function registerAction(
           where: { cpf },
           select: { id: true },
         });
-
-        if (duplicateCpf) {
-          return { error: "Este CPF já está cadastrado." };
-        }
-        if (duplicateEmail) {
-          return { error: "Este e-mail já está cadastrado." };
-        }
-
+        if (duplicateCpf) return { error: "Este CPF já está cadastrado." };
+        if (duplicateEmail) return { error: "Este e-mail já está cadastrado." };
         continue;
       }
-
       throw error;
     }
   }
 
   return { error: "Não foi possível gerar um link exclusivo. Tente novamente." };
+}
+
+export async function verifyLegacyCredentialsAction(
+  emailInput: string,
+  password: string,
+): Promise<boolean> {
+  const email = emailInput.trim().toLowerCase();
+  if (
+    !emailPattern.test(email) ||
+    email.length > 254 ||
+    !password ||
+    new TextEncoder().encode(password).length > 72
+  ) {
+    return false;
+  }
+
+  const professional = await getPrismaClient().professional.findUnique({
+    where: { email },
+    select: { passwordHash: true, firebaseUid: true },
+  });
+  if (!professional?.passwordHash || professional.firebaseUid) {
+    return false;
+  }
+
+  return compare(password, professional.passwordHash);
+}
+
+export async function linkLegacyFirebaseAccountAction(
+  idToken: string,
+): Promise<FormState> {
+  const identity = await verifyFirebaseIdToken(idToken);
+  if (
+    !identity ||
+    identity.emailVerified ||
+    !identity.providers.includes("password")
+  ) {
+    return { error: "Não foi possível vincular a conta Firebase." };
+  }
+
+  const prisma = getPrismaClient();
+  const professional = await prisma.professional.findUnique({
+    where: { email: identity.email },
+    select: { id: true, firebaseUid: true, passwordHash: true },
+  });
+  if (
+    !professional ||
+    professional.firebaseUid ||
+    !professional.passwordHash
+  ) {
+    return { error: "Não foi possível vincular a conta Firebase." };
+  }
+
+  try {
+    await prisma.professional.update({
+      where: { id: professional.id },
+      data: { firebaseUid: identity.uid, passwordHash: null },
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return { error: "Não foi possível vincular a conta Firebase." };
+    }
+    throw error;
+  }
+
+  return { success: "Conta Firebase vinculada." };
 }
 
 export async function logoutAction(): Promise<void> {

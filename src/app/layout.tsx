@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import type { ReactNode } from "react";
 import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
+import { InstallPrompt } from "@/components/pwa/install-prompt";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -41,6 +43,9 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
       <body className="flex min-h-full flex-col">
         <ServiceWorkerRegistration />
         <main className="flex flex-1 flex-col">{children}</main>
+        <Suspense fallback={null}>
+          <InstallPrompt />
+        </Suspense>
         <footer className="border-t border-vitta-border px-6 py-4 text-center text-xs text-vitta-muted">
           Desenvolvido pela{" "}
           <a

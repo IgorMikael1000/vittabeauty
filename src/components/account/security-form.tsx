@@ -1,13 +1,22 @@
 "use client";
 
-import { useState, useTransition, type FormEvent } from "react";
 import {
-  updatePasswordAction,
-  verifyCurrentPasswordAction,
-} from "@/app/actions/account";
+  useEffect,
+  useState,
+  useTransition,
+  type FormEvent,
+} from "react";
+import {
+  EmailAuthProvider,
+  onAuthStateChanged,
+  reauthenticateWithCredential,
+  updatePassword as updateFirebasePassword,
+  type User,
+} from "firebase/auth";
 import type { FormState } from "@/app/actions/auth";
 import { FormFeedback } from "@/components/forms/form-feedback";
 import { getPasswordRequirements } from "@/lib/professional-validation";
+import { auth } from "@/lib/firebase";
 
 const initialState: FormState = {};
 
@@ -96,6 +105,7 @@ export function SecurityForm() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [unlocked, setUnlocked] = useState(false);
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [verifyState, setVerifyState] = useState<FormState>(initialState);
   const [updateState, setUpdateState] = useState<FormState>(initialState);
   const [pending, startTransition] = useTransition();
@@ -103,37 +113,130 @@ export function SecurityForm() {
   const requirements = getPasswordRequirements(newPassword);
   const passwordsMatch =
     confirmPassword.length > 0 && newPassword === confirmPassword;
+  const passwordProvider = firebaseUser?.providerData.some(
+    (provider) => provider.providerId === "password",
+  );
+
+  useEffect(
+    () => onAuthStateChanged(auth, setFirebaseUser),
+    [],
+  );
 
   function verifyCurrentPassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
     setUpdateState(initialState);
 
     startTransition(async () => {
-      const result = await verifyCurrentPasswordAction(verifyState, formData);
-      setVerifyState(result);
-      if (result.success) {
+      try {
+        const user = firebaseUser;
+        if (!user?.email || !passwordProvider) {
+          setVerifyState({
+            error: "Esta conta não possui uma senha de acesso para revalidar.",
+          });
+          return;
+        }
+        await reauthenticateWithCredential(
+          user,
+          EmailAuthProvider.credential(user.email, currentPassword),
+        );
+        setVerifyState({ success: "Senha atual confirmada." });
         setUnlocked(true);
+      } catch (error) {
+        const code =
+          typeof error === "object" &&
+          error !== null &&
+          "code" in error &&
+          typeof error.code === "string"
+            ? error.code
+            : "";
+        setVerifyState({
+          error:
+            code === "auth/wrong-password" ||
+            code === "auth/invalid-credential"
+              ? "A senha atual está incorreta."
+              : code === "auth/requires-recent-login"
+                ? "Entre novamente e tente alterar sua senha."
+                : "Não foi possível confirmar a senha atual.",
+        });
       }
     });
   }
 
   function updatePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    formData.set("currentPassword", currentPassword);
-
     startTransition(async () => {
-      const result = await updatePasswordAction(updateState, formData);
-      setUpdateState(result);
-      if (result.success) {
+      try {
+        const user = firebaseUser;
+        if (!user || !unlocked) {
+          setUpdateState({
+            error: "Confirme sua senha atual antes de continuar.",
+          });
+          return;
+        }
+        if (newPassword !== confirmPassword) {
+          setUpdateState({
+            error: "A confirmação não corresponde à nova senha.",
+          });
+          return;
+        }
+        if (newPassword === currentPassword) {
+          setUpdateState({
+            error: "Escolha uma senha diferente da senha atual.",
+          });
+          return;
+        }
+        if (
+          getPasswordRequirements(newPassword).some(
+            (requirement) => !requirement.met,
+          )
+        ) {
+          setUpdateState({
+            error: "A nova senha não cumpre todos os requisitos de segurança.",
+          });
+          return;
+        }
+
+        await updateFirebasePassword(user, newPassword);
+        setUpdateState({ success: "Senha atualizada com segurança." });
         setUnlocked(false);
         setVerifyState(initialState);
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
+      } catch (error) {
+        const code =
+          typeof error === "object" &&
+          error !== null &&
+          "code" in error &&
+          typeof error.code === "string"
+            ? error.code
+            : "";
+        setUpdateState({
+          error:
+            code === "auth/requires-recent-login"
+              ? "Entre novamente e repita a confirmação da senha atual."
+              : code === "auth/weak-password"
+                ? "A nova senha não atende aos requisitos do Firebase."
+                : "Não foi possível atualizar a senha. Tente novamente.",
+        });
       }
     });
+  }
+
+  if (passwordProvider === undefined) {
+    return (
+      <p className="text-sm text-vitta-muted">Carregando os dados de acesso…</p>
+    );
+  }
+
+  if (!passwordProvider) {
+    return (
+      <p className="rounded-2xl border border-vitta-border bg-vitta-background/70 p-4 text-sm leading-6 text-vitta-muted">
+        Esta conta não possui uma senha do Vitta Beauty para alterar. Entre
+        usando o Google ou use “Esqueci minha senha” caso tenha adicionado
+        acesso por e-mail.
+      </p>
+    );
   }
 
   return (
