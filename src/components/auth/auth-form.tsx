@@ -67,7 +67,10 @@ export function AuthForm({
   const [pending, startTransition] = useTransition();
 
   async function completeSignIn(user: User) {
-    if (!user.emailVerified) {
+    const usesGoogleProvider = user.providerData.some(
+      (provider) => provider.providerId === "google.com",
+    );
+    if (!user.emailVerified && !usesGoogleProvider) {
       setVerificationUser(user);
       setError(
         "Seu e-mail ainda precisa ser confirmado. Use o botão abaixo para reenviar a confirmação.",

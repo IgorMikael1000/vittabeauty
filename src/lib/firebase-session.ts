@@ -37,7 +37,10 @@ export async function createFirebaseSession(idToken: string): Promise<void> {
   if (!identity) {
     throw new Error("The Firebase ID token is invalid or expired.");
   }
-  if (!identity.emailVerified) {
+  if (
+    !identity.emailVerified &&
+    !identity.providers.includes("google.com")
+  ) {
     throw new Error("Firebase email must be verified before creating a session.");
   }
 

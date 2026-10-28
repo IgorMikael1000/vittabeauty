@@ -51,7 +51,12 @@ export async function loginWithFirebaseAction(
     };
   }
 
-  if (!identity || !identity.emailVerified) {
+  if (!identity) {
+    return { error: "Não foi possível validar sua conta. Tente novamente." };
+  }
+
+  const usesGoogleProvider = identity.providers.includes("google.com");
+  if (!identity.emailVerified && !usesGoogleProvider) {
     return { error: "Confirme seu e-mail antes de entrar no Vitta Beauty." };
   }
 
@@ -183,7 +188,7 @@ export async function registerAction(
     !identity ||
     identity.email !== email ||
     (method === "google" &&
-      (!identity.emailVerified || !identity.providers.includes("google.com"))) ||
+      !identity.providers.includes("google.com")) ||
     (method === "password" && !identity.providers.includes("password"))
   ) {
     return { error: "A autenticação Firebase não corresponde a este cadastro." };

@@ -11,7 +11,7 @@ const sessionAudience = "vitta-dashboard";
 export type FirebaseSessionClaims = {
   uid: string;
   email: string;
-  email_verified: true;
+  email_verified: boolean;
   firebase: { sign_in_provider: string };
 };
 
@@ -47,7 +47,7 @@ export async function verifyFirebaseSessionCookie(
     !payload.uid ||
     payload.sub !== payload.uid ||
     typeof payload.email !== "string" ||
-    payload.email_verified !== true ||
+    typeof payload.email_verified !== "boolean" ||
     typeof firebase !== "object" ||
     firebase === null ||
     !("sign_in_provider" in firebase) ||
@@ -59,7 +59,7 @@ export async function verifyFirebaseSessionCookie(
   return {
     uid: payload.uid,
     email: payload.email,
-    email_verified: true,
+    email_verified: payload.email_verified,
     firebase: { sign_in_provider: firebase.sign_in_provider },
   };
 }
