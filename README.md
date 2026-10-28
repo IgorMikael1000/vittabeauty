@@ -157,6 +157,11 @@ apagar os valores existentes nela.
   As sessões duram cinco dias; a revogação de tokens no Firebase não invalida
   automaticamente uma sessão já emitida. O logout limpa o cookie atual e a
   rotação de `AUTH_SESSION_SECRET` invalida todas as sessões.
+- Os links de ação do Firebase devem usar o handler personalizado
+  `https://vittabeauty.vercel.app/auth/action`. Configure essa URL nos modelos
+  de e-mail em Authentication > Templates no Firebase Console e autorize o
+  domínio `vittabeauty.vercel.app`. A aplicação encaminha redefinição de senha,
+  verificação/alteração de e-mail e recuperação de e-mail para telas próprias.
 - Configure também limites de requisição no provedor de borda para login,
   cadastro e envio de solicitações públicas antes da exposição à internet.
 - O trial profissional dura três dias a partir do cadastro. Após o vencimento,

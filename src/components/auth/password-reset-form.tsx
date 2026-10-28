@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { sendPasswordResetEmail } from "firebase/auth";
+import { getFirebaseActionCodeSettings } from "@/lib/firebase-action-settings";
 import { auth } from "@/lib/firebase";
 
 export function PasswordResetForm() {
@@ -17,7 +18,11 @@ export function PasswordResetForm() {
     setError("");
     setSent(false);
     try {
-      await sendPasswordResetEmail(auth, email.trim().toLowerCase());
+      await sendPasswordResetEmail(
+        auth,
+        email.trim().toLowerCase(),
+        getFirebaseActionCodeSettings(),
+      );
       setSent(true);
     } catch (resetError) {
       const code =

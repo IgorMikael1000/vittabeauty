@@ -20,6 +20,7 @@ import {
   hasValidProfessionalName,
   isValidCpf,
 } from "@/lib/professional-validation";
+import { getFirebaseActionCodeSettings } from "@/lib/firebase-action-settings";
 import { auth } from "@/lib/firebase";
 
 type RegistrationDetails = {
@@ -104,7 +105,7 @@ export function RegistrationWizard({
             user = credential.user;
           }
 
-          await sendEmailVerification(user);
+          await sendEmailVerification(user, getFirebaseActionCodeSettings());
         }
       } catch (error) {
         return { error: firebaseErrorMessage(error) };

@@ -16,6 +16,7 @@ import {
   loginWithFirebaseAction,
   verifyLegacyCredentialsAction,
 } from "@/app/actions/auth";
+import { getFirebaseActionCodeSettings } from "@/lib/firebase-action-settings";
 import { auth, googleProvider } from "@/lib/firebase";
 
 type AuthFormProps = {
@@ -144,7 +145,10 @@ export function AuthForm({
                 submittedEmail,
                 password,
               );
-              await sendEmailVerification(credential.user);
+              await sendEmailVerification(
+                credential.user,
+                getFirebaseActionCodeSettings(),
+              );
               const result = await linkLegacyFirebaseAccountAction(
                 await credential.user.getIdToken(true),
               );
@@ -190,7 +194,10 @@ export function AuthForm({
     if (!verificationUser) return;
     startTransition(async () => {
       try {
-        await sendEmailVerification(verificationUser);
+        await sendEmailVerification(
+          verificationUser,
+          getFirebaseActionCodeSettings(),
+        );
         setStatus(
           `Enviamos novamente o e-mail de confirmação para ${verificationUser.email}.`,
         );

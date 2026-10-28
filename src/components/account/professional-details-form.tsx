@@ -21,6 +21,7 @@ import {
 } from "@/app/actions/account";
 import type { FormState } from "@/app/actions/auth";
 import { FormFeedback } from "@/components/forms/form-feedback";
+import { getFirebaseActionCodeSettings } from "@/lib/firebase-action-settings";
 import { auth, googleProvider } from "@/lib/firebase";
 import {
   formatAccountPhone,
@@ -112,7 +113,10 @@ export function ProfessionalDetailsForm({
 
         if (emailChanged && auth.currentUser) {
           try {
-            await sendEmailVerification(auth.currentUser);
+            await sendEmailVerification(
+              auth.currentUser,
+              getFirebaseActionCodeSettings(),
+            );
             setState({
               success:
                 "Dados atualizados. Confirme o novo e-mail pelo link enviado para concluir a alteração.",
