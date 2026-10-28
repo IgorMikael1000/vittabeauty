@@ -7,6 +7,7 @@ export type FirebaseIdentity = {
   email: string;
   emailVerified: boolean;
   providers: string[];
+  photoUrl: string | null;
 };
 
 export type FirebaseTokenValidation = {
@@ -83,13 +84,33 @@ export async function verifyFirebaseIdTokenWithDiagnostics(
       diagnostic: "FIREBASE_SIGN_IN_PROVIDER_MISSING",
     };
   }
+  const identities =
+    "identities" in firebase &&
+    typeof firebase.identities === "object" &&
+    firebase.identities !== null
+      ? Object.keys(firebase.identities)
+      : [];
+  let photoUrl: string | null = null;
+  if (typeof payload.picture === "string" && payload.picture.length <= 2048) {
+    try {
+      const pictureUrl = new URL(payload.picture);
+      if (pictureUrl.protocol === "https:" && !pictureUrl.username && !pictureUrl.password) {
+        photoUrl = pictureUrl.toString();
+      }
+    } catch {
+      photoUrl = null;
+    }
+  }
 
   return {
     identity: {
       uid: payload.sub,
       email: payload.email.trim().toLowerCase(),
       emailVerified: payload.email_verified,
-      providers: [firebase.sign_in_provider],
+      providers: Array.from(
+        new Set([firebase.sign_in_provider, ...identities]),
+      ),
+      photoUrl,
     },
   };
 }

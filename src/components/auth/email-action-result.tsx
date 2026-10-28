@@ -3,7 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { applyActionCode } from "firebase/auth";
+import { useRouter } from "next/navigation";
+import { applyActionCode, reload } from "firebase/auth";
+import { syncProfessionalEmailFromFirebaseAction } from "@/app/actions/account";
 import { auth } from "@/lib/firebase";
 
 const actionPromises = new Map<string, Promise<void>>();
@@ -28,6 +30,7 @@ export function EmailActionResult({
   mode,
   result,
 }: EmailActionResultProps) {
+  const router = useRouter();
   const [status, setStatus] = useState<"loading" | "success" | "error">(
     result ? "error" : "loading",
   );
@@ -47,6 +50,23 @@ export function EmailActionResult({
 
       try {
         await applyEmailActionCodeOnce(actionCode);
+        if (mode === "verifyAndChangeEmail") {
+          const user = auth.currentUser;
+          if (!user) {
+            throw new Error("The Firebase user is not signed in in this browser.");
+          }
+          await reload(user);
+          const syncResult = await syncProfessionalEmailFromFirebaseAction(
+            await user.getIdToken(true),
+          );
+          if (syncResult.error) throw new Error(syncResult.error);
+          if (active) {
+            setStatus("success");
+            router.replace("/dashboard/conta/dados?emailUpdated=1");
+            router.refresh();
+          }
+          return;
+        }
         if (active) setStatus("success");
       } catch {
         if (active) setStatus("error");
@@ -57,7 +77,7 @@ export function EmailActionResult({
     return () => {
       active = false;
     };
-  }, [actionCode, mode, result]);
+  }, [actionCode, mode, result, router]);
 
   const title =
     mode === "recoverEmail"

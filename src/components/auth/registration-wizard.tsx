@@ -13,6 +13,7 @@ import {
   registerAction,
   type FormState,
 } from "@/app/actions/auth";
+import { PasswordInput } from "@/components/forms/password-input";
 import {
   formatBrazilianPhone,
   formatCpf,
@@ -75,15 +76,9 @@ export function RegistrationWizard({
   });
   const [nameError, setNameError] = useState("");
   const [cpfError, setCpfError] = useState("");
-  const [debugInfo, setDebugInfo] = useState("");
   const [password, setPassword] = useState("");
   const [state, formAction, pending] = useActionState(
     async (previousState: FormState, formData: FormData) => {
-      setDebugInfo(
-        googleRegistration
-          ? "GOOGLE_PROFILE_SUBMISSION_STARTED"
-          : "EMAIL_PROFILE_SUBMISSION_STARTED",
-      );
       const email = String(formData.get("email") ?? "")
         .trim()
         .toLowerCase();
@@ -114,16 +109,7 @@ export function RegistrationWizard({
           await sendEmailVerification(user, getFirebaseActionCodeSettings());
         }
       } catch (error) {
-        const code =
-          typeof error === "object" &&
-          error !== null &&
-          "code" in error &&
-          typeof error.code === "string"
-            ? error.code
-            : error instanceof Error
-              ? error.name
-              : "UNKNOWN_ERROR";
-        setDebugInfo(`FIREBASE_CLIENT_REGISTRATION_FAILED:${code}`);
+        console.error("Firebase registration client flow failed.", error);
         return { error: firebaseErrorMessage(error) };
       }
 
@@ -141,26 +127,13 @@ export function RegistrationWizard({
         formData.set("firebaseIdToken", idToken);
         result = await registerAction(previousState, formData);
       } catch (error) {
-        const code =
-          typeof error === "object" &&
-          error !== null &&
-          "code" in error &&
-          typeof error.code === "string"
-            ? error.code
-            : error instanceof Error
-              ? error.name
-              : "UNKNOWN_ERROR";
-        setDebugInfo(`REGISTRATION_SERVER_ACTION_FAILED:${code}`);
+        console.error("Registration server action failed.", error);
         return {
           error: "Não foi possível concluir o cadastro. Tente novamente.",
         };
       }
-      if (result.error) {
-        setDebugInfo(result.debug ?? "REGISTRATION_FAILED_WITHOUT_DIAGNOSTIC");
-        return result;
-      }
+      if (result.error) return result;
       if (googleRegistration) {
-        setDebugInfo("GOOGLE_PROFILE_SAVED_AND_SESSION_CREATED");
         router.replace("/dashboard");
         router.refresh();
         return result;
@@ -169,7 +142,7 @@ export function RegistrationWizard({
       try {
         await signOut(auth);
       } catch {
-        setDebugInfo("EMAIL_REGISTRATION_SUCCEEDED_BUT_SIGN_OUT_FAILED");
+        console.error("Firebase sign-out after registration failed.");
         return {
           error:
             "Cadastro concluído, mas não foi possível encerrar a sessão. Saia da conta e entre após confirmar o e-mail.",
@@ -268,20 +241,16 @@ export function RegistrationWizard({
                 {details.email}
               </p>
             </div>
-            <label className="block text-sm font-medium text-vitta-text">
-              Crie sua senha
-              <input
-                autoComplete="new-password"
-                className={inputClass}
-                maxLength={72}
-                minLength={8}
-                name="password"
-                onChange={(event) => setPassword(event.currentTarget.value)}
-                required
-                type="password"
-                value={password}
-              />
-            </label>
+            <PasswordInput
+              autoComplete="new-password"
+              id="registration-password"
+              label="Crie sua senha"
+              maxLength={72}
+              minLength={8}
+              name="password"
+              onChange={setPassword}
+              value={password}
+            />
             <ul aria-live="polite" className="grid gap-2 text-xs sm:grid-cols-2">
               {passwordRequirements.map((requirement) => (
                 <li
@@ -299,9 +268,6 @@ export function RegistrationWizard({
               <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert">
                 {state.error}
               </p>
-            )}
-            {debugInfo && (
-              <DebugInfoPanel debugInfo={debugInfo} />
             )}
             <div className="grid gap-3 sm:grid-cols-2">
               <button
@@ -434,9 +400,6 @@ export function RegistrationWizard({
                 {state.error}
               </p>
             )}
-            {debugInfo && (
-              <DebugInfoPanel debugInfo={debugInfo} />
-            )}
             <button
               className="w-full rounded-2xl bg-gradient-to-r from-[#7950a5] to-[#9368b3] px-5 py-3.5 font-semibold text-white disabled:opacity-60"
               disabled={pending}
@@ -462,21 +425,5 @@ export function RegistrationWizard({
         </Link>
       </p>
     </section>
-  );
-}
-
-function DebugInfoPanel({ debugInfo }: { debugInfo: string }) {
-  return (
-    <div
-      className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-left"
-      role="status"
-    >
-      <p className="text-xs font-semibold uppercase tracking-wide text-amber-900">
-        Diagnóstico temporário do cadastro
-      </p>
-      <pre className="mt-2 whitespace-pre-wrap break-words font-mono text-xs text-amber-950">
-        {debugInfo}
-      </pre>
-    </div>
   );
 }

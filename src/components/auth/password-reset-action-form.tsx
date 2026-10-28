@@ -8,6 +8,7 @@ import {
   confirmPasswordReset,
   verifyPasswordResetCode,
 } from "firebase/auth";
+import { PasswordInput } from "@/components/forms/password-input";
 import { auth } from "@/lib/firebase";
 
 type PasswordResetActionFormProps = {
@@ -144,30 +145,24 @@ export function PasswordResetActionForm({
 
       {!checkingCode && !error && !success && (
         <form className="space-y-4" onSubmit={submit}>
-          <label className="block text-sm font-medium text-vitta-text">
-            Nova senha
-            <input
-              autoComplete="new-password"
-              className="mt-2 w-full rounded-2xl border border-[#e9e3ed] bg-[#fcfbfd] px-4 py-3.5 text-vitta-text outline-none"
-              minLength={6}
-              onChange={(event) => setNewPassword(event.currentTarget.value)}
-              required
-              type="password"
-              value={newPassword}
-            />
-          </label>
-          <label className="block text-sm font-medium text-vitta-text">
-            Confirmar nova senha
-            <input
-              autoComplete="new-password"
-              className="mt-2 w-full rounded-2xl border border-[#e9e3ed] bg-[#fcfbfd] px-4 py-3.5 text-vitta-text outline-none"
-              minLength={6}
-              onChange={(event) => setConfirmPassword(event.currentTarget.value)}
-              required
-              type="password"
-              value={confirmPassword}
-            />
-          </label>
+          <PasswordInput
+            autoComplete="new-password"
+            id="reset-new-password"
+            label="Nova senha"
+            minLength={6}
+            name="newPassword"
+            onChange={setNewPassword}
+            value={newPassword}
+          />
+          <PasswordInput
+            autoComplete="new-password"
+            id="reset-confirm-password"
+            label="Confirmar nova senha"
+            minLength={6}
+            name="confirmPassword"
+            onChange={setConfirmPassword}
+            value={confirmPassword}
+          />
           <button
             className="w-full rounded-2xl bg-gradient-to-r from-[#7950a5] to-[#9368b3] px-5 py-3.5 font-semibold text-white shadow-[0_8px_18px_rgba(121,80,165,0.2)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={pending}

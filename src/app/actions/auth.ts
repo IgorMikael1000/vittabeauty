@@ -7,6 +7,7 @@ import {
   verifyFirebaseIdToken,
   verifyFirebaseIdTokenWithDiagnostics,
 } from "@/lib/verify-firebase-token";
+import { logAuthEvent } from "@/lib/auth-logger";
 import {
   clearFirebaseSession,
   createFirebaseSession,
@@ -16,7 +17,6 @@ import { getPrismaClient } from "@/lib/prisma";
 export type FormState = {
   error?: string;
   success?: string;
-  debug?: string;
 };
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -42,16 +42,18 @@ function getSafeErrorCode(error: unknown): string {
 
 async function createSessionResult(
   idToken: string,
-): Promise<{ success: boolean; error?: string; debug?: string }> {
+): Promise<{ success: boolean; error?: string }> {
   try {
     await createFirebaseSession(idToken);
     return { success: true };
   } catch (error) {
-    console.error("Could not create the Firebase application session.", error);
+    logAuthEvent("session.create_failed", {
+      outcome: "failed",
+      code: getSafeErrorCode(error),
+    });
     return {
       success: false,
       error: "Não foi possível iniciar a sessão. Tente novamente.",
-      debug: `SESSION_CREATION_FAILED:${getSafeErrorCode(error)}`,
     };
   }
 }
@@ -64,36 +66,41 @@ export async function loginWithFirebaseAction(
   googleRegistration?: boolean;
   success?: boolean;
   error?: string;
-  debug?: string;
 }> {
+  logAuthEvent("login.started", { outcome: "started" });
   let tokenValidation;
   try {
     tokenValidation = await verifyFirebaseIdTokenWithDiagnostics(idToken);
   } catch (error) {
-    console.error("Firebase sign-in failed.", error);
+    logAuthEvent("login.token_verification_failed", {
+      outcome: "failed",
+      code: getSafeErrorCode(error),
+    });
     return {
       error: "Não foi possível validar sua conta agora. Tente novamente.",
-      debug: `TOKEN_VERIFICATION_EXCEPTION:${getSafeErrorCode(error)}`,
     };
   }
 
   const identity = tokenValidation.identity;
   if (!identity) {
-    console.error(
-      "Firebase sign-in token was rejected.",
-      tokenValidation.diagnostic,
-    );
+    logAuthEvent("login.token_rejected", {
+      outcome: "rejected",
+      code: tokenValidation.diagnostic ?? "TOKEN_VALIDATION_FAILED",
+    });
     return {
       error: "Não foi possível validar sua conta. Tente novamente.",
-      debug: tokenValidation.diagnostic ?? "TOKEN_VALIDATION_FAILED",
     };
   }
 
   const usesGoogleProvider = identity.providers.includes("google.com");
+  const provider = usesGoogleProvider ? "google.com" : identity.providers[0];
   if (!identity.emailVerified && !usesGoogleProvider) {
+    logAuthEvent("login.email_not_verified", {
+      outcome: "rejected",
+      provider,
+    });
     return {
       error: "Confirme seu e-mail antes de entrar no Vitta Beauty.",
-      debug: `EMAIL_NOT_VERIFIED:${identity.providers[0] ?? "UNKNOWN_PROVIDER"}`,
     };
   }
 
@@ -112,7 +119,6 @@ export async function loginWithFirebaseAction(
       if (duplicateEmail && duplicateEmail.id !== professional.id) {
         return {
           error: "Este e-mail já está vinculado a outra conta.",
-          debug: "PRISMA_EMAIL_ALREADY_LINKED_TO_DIFFERENT_PROFILE",
         };
       }
 
@@ -129,7 +135,6 @@ export async function loginWithFirebaseAction(
         ) {
           return {
             error: "Este e-mail já está vinculado a outra conta.",
-            debug: "PRISMA_P2002_EMAIL_ALREADY_LINKED",
           };
         }
         throw error;
@@ -144,6 +149,10 @@ export async function loginWithFirebaseAction(
     }
 
     if (!professional) {
+      logAuthEvent("login.registration_required", {
+        outcome: "success",
+        provider,
+      });
       return {
         registrationRequired: true,
         email: identity.email,
@@ -154,7 +163,6 @@ export async function loginWithFirebaseAction(
     if (professional.firebaseUid && professional.firebaseUid !== identity.uid) {
       return {
         error: "Este e-mail já está vinculado a outra conta Firebase.",
-        debug: "PRISMA_PROFILE_LINKED_TO_DIFFERENT_FIREBASE_UID",
       };
     }
 
@@ -170,12 +178,33 @@ export async function loginWithFirebaseAction(
       });
     }
 
-    return createSessionResult(idToken);
+    if (usesGoogleProvider && identity.photoUrl) {
+      await prisma.professional.updateMany({
+        where: { id: professional.id, logoUrl: null },
+        data: { logoUrl: identity.photoUrl },
+      });
+    }
+
+    const result = await createSessionResult(idToken);
+    logAuthEvent(
+      result.success ? "login.completed" : "login.session_creation_failed",
+      {
+        outcome: result.success ? "success" : "failed",
+        provider,
+        ...(!result.success
+          ? { code: "SESSION_CREATION_FAILED" }
+          : {}),
+      },
+    );
+    return result;
   } catch (error) {
-    console.error("Firebase sign-in database lookup failed.", error);
+    logAuthEvent("login.database_failed", {
+      outcome: "failed",
+      provider,
+      code: getSafeErrorCode(error),
+    });
     return {
       error: "Não foi possível consultar seu cadastro. Tente novamente.",
-      debug: `LOGIN_DATABASE_OPERATION_FAILED:${getSafeErrorCode(error)}`,
     };
   }
 }
@@ -184,6 +213,7 @@ export async function registerAction(
   _previousState: FormState,
   formData: FormData,
 ): Promise<FormState> {
+  logAuthEvent("registration.started", { outcome: "started" });
   const nameInput = formData.get("name");
   const emailInput = formData.get("email");
   const cpfInput = formData.get("cpf");
@@ -234,22 +264,23 @@ export async function registerAction(
   try {
     tokenValidation = await verifyFirebaseIdTokenWithDiagnostics(idToken);
   } catch (error) {
-    console.error("Firebase registration token verification failed.", error);
+    logAuthEvent("registration.token_verification_failed", {
+      outcome: "failed",
+      code: getSafeErrorCode(error),
+    });
     return {
       error: "Não foi possível validar sua conta. Tente novamente.",
-      debug: `TOKEN_VERIFICATION_EXCEPTION:${getSafeErrorCode(error)}`,
     };
   }
 
   const identity = tokenValidation.identity;
   if (!identity) {
-    console.error(
-      "Firebase registration token was rejected.",
-      tokenValidation.diagnostic,
-    );
+    logAuthEvent("registration.token_rejected", {
+      outcome: "rejected",
+      code: tokenValidation.diagnostic ?? "TOKEN_VALIDATION_FAILED",
+    });
     return {
       error: "Não foi possível validar sua conta. Tente novamente.",
-      debug: tokenValidation.diagnostic ?? "TOKEN_VALIDATION_FAILED",
     };
   }
 
@@ -259,9 +290,12 @@ export async function registerAction(
       !identity.providers.includes("google.com")) ||
     (method === "password" && !identity.providers.includes("password"))
   ) {
+    logAuthEvent("registration.identity_mismatch", {
+      outcome: "rejected",
+      provider: method,
+    });
     return {
       error: "A autenticação Firebase não corresponde a este cadastro.",
-      debug: `REGISTRATION_IDENTITY_MISMATCH:method=${method}:provider=${identity.providers[0] ?? "UNKNOWN"}:email_match=${identity.email === email}`,
     };
   }
 
@@ -277,15 +311,30 @@ export async function registerAction(
         existingByUid.email !== email ||
         identity.email !== email
       ) {
+        logAuthEvent("registration.firebase_uid_already_exists", {
+          outcome: "rejected",
+          provider: method,
+        });
         return {
           error: "Esta conta Firebase já possui um cadastro.",
-          debug: "PRISMA_FIREBASE_UID_ALREADY_REGISTERED",
         };
       }
+      if (identity.photoUrl) {
+        await prisma.professional.updateMany({
+          where: { id: existingByUid.id, logoUrl: null },
+          data: { logoUrl: identity.photoUrl },
+        });
+      }
       const sessionResult = await createSessionResult(idToken);
+      if (sessionResult.success) {
+        logAuthEvent("registration.completed", {
+          outcome: "success",
+          provider: method,
+        });
+      }
       return sessionResult.success
         ? { success: "Cadastro realizado." }
-        : { error: sessionResult.error, debug: sessionResult.debug };
+        : { error: sessionResult.error };
     }
 
     const duplicate = await prisma.professional.findFirst({
@@ -293,15 +342,16 @@ export async function registerAction(
       select: { email: true, cpf: true },
     });
     if (duplicate) {
+      logAuthEvent("registration.duplicate_profile", {
+        outcome: "rejected",
+        provider: method,
+        code: duplicate.cpf === cpf ? "CPF_EXISTS" : "EMAIL_EXISTS",
+      });
       return {
         error:
           duplicate.cpf === cpf
             ? "Este CPF já está cadastrado."
             : "Este e-mail já está cadastrado.",
-        debug:
-          duplicate.cpf === cpf
-            ? "PRISMA_CPF_ALREADY_REGISTERED"
-            : "PRISMA_EMAIL_ALREADY_REGISTERED",
       };
     }
 
@@ -325,6 +375,7 @@ export async function registerAction(
             cpf,
             phone,
             specialty,
+            logoUrl: method === "google" ? identity.photoUrl : null,
             slug,
             subscriptionStatus: "TRIAL",
             planType: "FREE",
@@ -335,16 +386,21 @@ export async function registerAction(
         if (method === "google") {
           const sessionResult = await createSessionResult(idToken);
           if (!sessionResult.success) {
-            return { error: sessionResult.error, debug: sessionResult.debug };
+            return { error: sessionResult.error };
           }
         }
 
+        logAuthEvent("registration.completed", {
+          outcome: "success",
+          provider: method,
+        });
         return { success: "Cadastro realizado." };
       } catch (error) {
-        console.error(
-          "Prisma Professional.create failed while registering a Firebase user.",
-          error,
-        );
+        logAuthEvent("registration.profile_create_failed", {
+          outcome: "failed",
+          provider: method,
+          code: getSafeErrorCode(error),
+        });
         if (
           error instanceof Prisma.PrismaClientKnownRequestError &&
           error.code === "P2002"
@@ -358,15 +414,23 @@ export async function registerAction(
             select: { id: true },
           });
           if (duplicateCpf) {
+            logAuthEvent("registration.duplicate_profile", {
+              outcome: "rejected",
+              provider: method,
+              code: "CPF_EXISTS",
+            });
             return {
               error: "Este CPF já está cadastrado.",
-              debug: "PRISMA_CPF_ALREADY_REGISTERED",
             };
           }
           if (duplicateEmail) {
+            logAuthEvent("registration.duplicate_profile", {
+              outcome: "rejected",
+              provider: method,
+              code: "EMAIL_EXISTS",
+            });
             return {
               error: "Este e-mail já está cadastrado.",
-              debug: "PRISMA_EMAIL_ALREADY_REGISTERED",
             };
           }
           continue;
@@ -374,20 +438,21 @@ export async function registerAction(
         return {
           error:
             "Não foi possível salvar seu cadastro agora. Tente novamente em instantes.",
-          debug: `PRISMA_PROFESSIONAL_CREATE_FAILED:${getSafeErrorCode(error)}`,
         };
       }
     }
 
     return {
       error: "Não foi possível gerar um link exclusivo. Tente novamente.",
-      debug: "PRISMA_SLUG_RETRIES_EXHAUSTED",
     };
   } catch (error) {
-    console.error("Firebase registration database operation failed.", error);
+    logAuthEvent("registration.database_failed", {
+      outcome: "failed",
+      provider: method,
+      code: getSafeErrorCode(error),
+    });
     return {
       error: "Não foi possível consultar ou salvar seu cadastro.",
-      debug: `REGISTRATION_DATABASE_OPERATION_FAILED:${getSafeErrorCode(error)}`,
     };
   }
 }

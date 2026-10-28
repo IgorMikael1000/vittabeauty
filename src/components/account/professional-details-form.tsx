@@ -10,11 +10,10 @@ import {
   EmailAuthProvider,
   onAuthStateChanged,
   reauthenticateWithCredential,
-  reauthenticateWithPopup,
-  sendEmailVerification,
-  updateEmail,
+  verifyBeforeUpdateEmail,
   type User,
 } from "firebase/auth";
+import { Pencil, X } from "lucide-react";
 import {
   checkProfessionalEmailAction,
   updateProfessionalDetailsAction,
@@ -22,7 +21,8 @@ import {
 import type { FormState } from "@/app/actions/auth";
 import { FormFeedback } from "@/components/forms/form-feedback";
 import { getFirebaseActionCodeSettings } from "@/lib/firebase-action-settings";
-import { auth, googleProvider } from "@/lib/firebase";
+import { PasswordInput } from "@/components/forms/password-input";
+import { auth } from "@/lib/firebase";
 import {
   formatAccountPhone,
   formatCpf,
@@ -47,10 +47,16 @@ export function ProfessionalDetailsForm({
 }) {
   const [state, setState] = useState(initialState);
   const [pending, startTransition] = useTransition();
+  const [emailPending, startEmailTransition] = useTransition();
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [email, setEmail] = useState(professional.email);
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [emailChangeRequested, setEmailChangeRequested] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const emailChanged = email.trim().toLowerCase() !== professional.email;
+  const googleAccount = firebaseUser?.providerData.some(
+    (provider) => provider.providerId === "google.com",
+  );
 
   useEffect(
     () => onAuthStateChanged(auth, setFirebaseUser),
@@ -60,78 +66,19 @@ export function ProfessionalDetailsForm({
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    const normalizedEmail = email.trim().toLowerCase();
     setState(initialState);
 
     startTransition(async () => {
       try {
-        if (emailChanged) {
-          const availability = await checkProfessionalEmailAction(email);
-          if (availability.error) {
-            setState(availability);
-            return;
-          }
-
-          const user = firebaseUser;
-          if (!user || !user.email) {
-            setState({
-              error:
-                "Sua sessão Firebase expirou. Entre novamente para alterar o e-mail.",
-            });
-            return;
-          }
-
-          if (user.providerData.some((provider) => provider.providerId === "password")) {
-            if (!currentPassword) {
-              setState({ error: "Informe sua senha atual para trocar o e-mail." });
-              return;
-            }
-            await reauthenticateWithCredential(
-              user,
-              EmailAuthProvider.credential(user.email, currentPassword),
-            );
-          } else if (
-            user.providerData.some((provider) => provider.providerId === "google.com")
-          ) {
-            await reauthenticateWithPopup(user, googleProvider);
-          } else {
-            setState({
-              error: "Este método de acesso não permite reautenticação de e-mail.",
-            });
-            return;
-          }
-
-          await updateEmail(user, normalizedEmail);
-          formData.set("firebaseIdToken", await user.getIdToken(true));
-        }
-
         const result = await updateProfessionalDetailsAction(formData);
         if (result.error) {
           setState(result);
           return;
         }
 
-        if (emailChanged && auth.currentUser) {
-          try {
-            await sendEmailVerification(
-              auth.currentUser,
-              getFirebaseActionCodeSettings(),
-            );
-            setState({
-              success:
-                "Dados atualizados. Confirme o novo e-mail pelo link enviado para concluir a alteração.",
-            });
-          } catch {
-            setState({
-              success:
-                "Dados atualizados, mas não foi possível enviar a confirmação do novo e-mail. Reenvie a confirmação ao entrar.",
-            });
-          }
-        } else {
-          setState(result);
-        }
-        setCurrentPassword("");
+        setState(result);
       } catch (error) {
+        console.error("Could not save professional profile details.", error);
         const code =
           typeof error === "object" &&
           error !== null &&
@@ -149,6 +96,82 @@ export function ProfessionalDetailsForm({
                 : code === "auth/email-already-in-use"
                   ? "Este e-mail já está sendo usado por outra conta Firebase."
                   : "Não foi possível atualizar os dados. Tente novamente.",
+        });
+      }
+    });
+  }
+
+  function requestEmailChange() {
+    setState(initialState);
+    startEmailTransition(async () => {
+      try {
+        if (googleAccount) {
+          setState({
+            error: "Contas acessadas pelo Google não podem alterar o e-mail.",
+          });
+          return;
+        }
+
+        const user = firebaseUser;
+        const normalizedEmail = email.trim().toLowerCase();
+        if (!user?.email || !user.providerData.some(
+          (provider) => provider.providerId === "password",
+        )) {
+          setState({
+            error: "Esta conta não possui acesso por e-mail e senha.",
+          });
+          return;
+        }
+        if (!emailChanged) {
+          setState({ error: "Informe um e-mail diferente do atual." });
+          return;
+        }
+
+        const availability = await checkProfessionalEmailAction(normalizedEmail);
+        if (availability.error) {
+          setState(availability);
+          return;
+        }
+        if (!currentPassword) {
+          setState({ error: "Informe sua senha atual para confirmar a alteração." });
+          return;
+        }
+
+        await reauthenticateWithCredential(
+          user,
+          EmailAuthProvider.credential(user.email, currentPassword),
+        );
+        await verifyBeforeUpdateEmail(
+          user,
+          normalizedEmail,
+          getFirebaseActionCodeSettings("/auth/email-atualizado"),
+        );
+        setEmailChangeRequested(true);
+        setEditingEmail(false);
+        setCurrentPassword("");
+        setState({
+          success:
+            "Enviamos um link de confirmação para o novo endereço. Abra-o neste navegador para atualizar seu perfil e continuar conectado.",
+        });
+      } catch (error) {
+        console.error("Could not request Firebase email change.", error);
+        const code =
+          typeof error === "object" &&
+          error !== null &&
+          "code" in error &&
+          typeof error.code === "string"
+            ? error.code
+            : "";
+        setState({
+          error:
+            code === "auth/wrong-password" ||
+            code === "auth/invalid-credential"
+              ? "A senha atual está incorreta."
+              : code === "auth/requires-recent-login"
+                ? "A sessão expirou. Entre novamente e tente alterar o e-mail."
+                : code === "auth/email-already-in-use"
+                  ? "Este e-mail já está sendo usado por outra conta Firebase."
+                  : "Não foi possível enviar a confirmação do novo e-mail.",
         });
       }
     });
@@ -172,45 +195,77 @@ export function ProfessionalDetailsForm({
         </span>
       </label>
 
-      <label className="block text-sm font-medium text-vitta-text">
-        E-mail
+      <div>
+        <div className="flex items-center justify-between gap-3">
+          <label
+            className="block text-sm font-medium text-vitta-text"
+            htmlFor="professional-email"
+          >
+            E-mail
+          </label>
+          {firebaseUser && !googleAccount && !emailChangeRequested && (
+            <button
+              aria-label={editingEmail ? "Cancelar alteração de e-mail" : "Editar e-mail"}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-vitta transition hover:bg-vitta-background"
+              onClick={() => {
+                setState(initialState);
+                setEmail(editingEmail ? professional.email : email);
+                setEditingEmail((current) => !current);
+                setCurrentPassword("");
+              }}
+              type="button"
+            >
+              {editingEmail ? (
+                <X aria-hidden="true" className="h-4 w-4" />
+              ) : (
+                <Pencil aria-hidden="true" className="h-4 w-4" />
+              )}
+            </button>
+          )}
+        </div>
         <input
           autoComplete="email"
-          className={inputClass}
+          className={`${inputClass} ${!editingEmail || googleAccount || emailChangeRequested ? "cursor-not-allowed bg-[#f3f0f5] text-vitta-muted" : ""}`}
+          id="professional-email"
           maxLength={254}
-          name="email"
           onChange={(event) => setEmail(event.currentTarget.value)}
-          required
+          readOnly={!editingEmail || !!googleAccount || emailChangeRequested}
           type="email"
           value={email}
         />
-      </label>
-      {emailChanged && firebaseUser?.providerData.some(
-        (provider) => provider.providerId === "password",
-      ) && (
-        <label className="block text-sm font-medium text-vitta-text">
-          Senha atual para reautenticar
-          <input
-            autoComplete="current-password"
-            className={inputClass}
-            onChange={(event) =>
-              setCurrentPassword(event.currentTarget.value)
-            }
-            placeholder="Usuários Google confirmarão em uma janela"
-            type="password"
-            value={currentPassword}
-          />
-        </label>
-      )}
-      {emailChanged &&
-        firebaseUser?.providerData.some(
-          (provider) => provider.providerId === "google.com",
-        ) && (
-          <p className="text-xs leading-5 text-vitta-muted">
-            Sua identidade será confirmada em uma janela do Google antes da
-            alteração.
+        {googleAccount && (
+          <span className="mt-1.5 block text-xs text-vitta-muted">
+            O e-mail é gerenciado pelo Google e não pode ser alterado aqui.
+          </span>
+        )}
+        {editingEmail && !googleAccount && (
+          <div className="mt-4 space-y-4 rounded-2xl border border-vitta-border bg-vitta-background/50 p-4">
+            <PasswordInput
+              autoComplete="current-password"
+              id="email-change-current-password"
+              label="Senha atual para confirmar"
+              maxLength={72}
+              name="emailChangeCurrentPassword"
+              onChange={setCurrentPassword}
+              value={currentPassword}
+            />
+            <button
+              className="w-full rounded-2xl bg-gradient-to-r from-[#7950a5] to-[#9368b3] px-5 py-3.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+              disabled={emailPending || !emailChanged || !currentPassword}
+              onClick={requestEmailChange}
+              type="button"
+            >
+              {emailPending ? "Enviando confirmação..." : "Enviar confirmação"}
+            </button>
+          </div>
+        )}
+        {emailChangeRequested && (
+          <p className="mt-2 text-xs leading-5 text-vitta-muted">
+            Aguardando confirmação no novo endereço. Abra o link no mesmo
+            navegador para voltar ao Vitta Beauty já conectado.
           </p>
         )}
+      </div>
 
       <label className="block text-sm font-medium text-vitta-text">
         Telefone / WhatsApp

@@ -13,92 +13,14 @@ import {
   updatePassword as updateFirebasePassword,
   type User,
 } from "firebase/auth";
+import { recordFirebasePasswordChangeAction } from "@/app/actions/account";
 import type { FormState } from "@/app/actions/auth";
 import { FormFeedback } from "@/components/forms/form-feedback";
+import { PasswordInput } from "@/components/forms/password-input";
 import { getPasswordRequirements } from "@/lib/professional-validation";
 import { auth } from "@/lib/firebase";
 
 const initialState: FormState = {};
-
-function PasswordInput({
-  id,
-  label,
-  name,
-  onChange,
-  value,
-}: {
-  id: string;
-  label: string;
-  name: string;
-  onChange: (value: string) => void;
-  value: string;
-}) {
-  const [visible, setVisible] = useState(false);
-
-  return (
-    <div>
-      <label
-        className="block text-sm font-medium text-vitta-text"
-        htmlFor={id}
-      >
-        {label}
-      </label>
-      <span className="relative mt-2 block">
-        <input
-          autoComplete="new-password"
-          className="w-full rounded-2xl border border-[#e9e3ed] bg-[#fcfbfd] px-4 py-3.5 pr-14 text-vitta-text outline-none transition"
-          id={id}
-          maxLength={72}
-          name={name}
-          onChange={(event) => onChange(event.currentTarget.value)}
-          required
-          type={visible ? "text" : "password"}
-          value={value}
-        />
-        <button
-          aria-label={
-            visible
-              ? `Ocultar ${label.toLowerCase()}`
-              : `Mostrar ${label.toLowerCase()}`
-          }
-          aria-pressed={visible}
-          className="absolute inset-y-0 right-2 flex w-10 items-center justify-center rounded-xl text-vitta-muted transition hover:bg-vitta-background hover:text-vitta"
-          onClick={() => setVisible((current) => !current)}
-          type="button"
-        >
-          {visible ? (
-            <svg
-              aria-hidden="true"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="1.7"
-              viewBox="0 0 24 24"
-            >
-              <path d="M3 3l18 18M10.58 10.59a2 2 0 0 0 2.83 2.82M9.88 5.09A10.94 10.94 0 0 1 12 4.9c5 0 9 4.1 10 7.1a11.8 11.8 0 0 1-3.07 4.55M6.61 6.62A12.08 12.08 0 0 0 2 12c1 3 5 7.1 10 7.1 1.02 0 1.99-.19 2.88-.53" />
-            </svg>
-          ) : (
-            <svg
-              aria-hidden="true"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="1.7"
-              viewBox="0 0 24 24"
-            >
-              <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
-          )}
-        </button>
-      </span>
-    </div>
-  );
-}
 
 export function SecurityForm() {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -116,7 +38,9 @@ export function SecurityForm() {
   const passwordProvider = firebaseUser?.providerData.some(
     (provider) => provider.providerId === "password",
   );
-
+  const googleAccount = firebaseUser?.providerData.some(
+    (provider) => provider.providerId === "google.com",
+  );
   useEffect(
     () => onAuthStateChanged(auth, setFirebaseUser),
     [],
@@ -197,6 +121,16 @@ export function SecurityForm() {
         }
 
         await updateFirebasePassword(user, newPassword);
+        const logResult = await recordFirebasePasswordChangeAction(
+          await user.getIdToken(true),
+        );
+        if (logResult.error) {
+          setUpdateState({
+            error:
+              "A senha foi alterada no Firebase, mas não conseguimos registrar a confirmação. Entre novamente se tiver problemas de acesso.",
+          });
+          return;
+        }
         setUpdateState({ success: "Senha atualizada com segurança." });
         setUnlocked(false);
         setVerifyState(initialState);
@@ -229,6 +163,14 @@ export function SecurityForm() {
     );
   }
 
+  if (googleAccount) {
+    return (
+      <p className="rounded-2xl border border-vitta-border bg-vitta-background/70 p-4 text-sm leading-6 text-vitta-muted">
+        Contas acessadas pelo Google não podem alterar a senha por aqui.
+      </p>
+    );
+  }
+
   if (!passwordProvider) {
     return (
       <p className="rounded-2xl border border-vitta-border bg-vitta-background/70 p-4 text-sm leading-6 text-vitta-muted">
@@ -245,19 +187,15 @@ export function SecurityForm() {
 
       {!verified ? (
         <form className="space-y-5" onSubmit={verifyCurrentPassword}>
-          <label className="block text-sm font-medium text-vitta-text">
-            Senha Atual
-            <input
-              autoComplete="current-password"
-              className="mt-2 w-full rounded-2xl border border-[#e9e3ed] bg-[#fcfbfd] px-4 py-3.5 text-vitta-text outline-none transition"
-              maxLength={72}
-              name="currentPassword"
-              onChange={(event) => setCurrentPassword(event.currentTarget.value)}
-              required
-              type="password"
-              value={currentPassword}
-            />
-          </label>
+          <PasswordInput
+            autoComplete="current-password"
+            id="current-password"
+            label="Senha Atual"
+            maxLength={72}
+            name="currentPassword"
+            onChange={setCurrentPassword}
+            value={currentPassword}
+          />
           <FormFeedback state={verifyState} />
           <button
             className="w-full rounded-2xl bg-gradient-to-r from-[#7950a5] to-[#9368b3] px-5 py-3.5 font-semibold text-white shadow-[0_8px_18px_rgba(121,80,165,0.2)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-44"
@@ -277,8 +215,10 @@ export function SecurityForm() {
           </div>
 
           <PasswordInput
+            autoComplete="new-password"
             id="new-password"
             label="Nova Senha"
+            maxLength={72}
             name="newPassword"
             onChange={setNewPassword}
             value={newPassword}
@@ -308,8 +248,10 @@ export function SecurityForm() {
 
           <div>
             <PasswordInput
+              autoComplete="new-password"
               id="confirm-new-password"
               label="Confirmar Nova Senha"
+              maxLength={72}
               name="confirmPassword"
               onChange={setConfirmPassword}
               value={confirmPassword}

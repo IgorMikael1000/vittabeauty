@@ -16,6 +16,7 @@ import {
   loginWithFirebaseAction,
   verifyLegacyCredentialsAction,
 } from "@/app/actions/auth";
+import { PasswordInput } from "@/components/forms/password-input";
 import { getFirebaseActionCodeSettings } from "@/lib/firebase-action-settings";
 import { auth, googleProvider } from "@/lib/firebase";
 
@@ -61,9 +62,9 @@ export function AuthForm({
 }: AuthFormProps) {
   const router = useRouter();
   const [email, setEmail] = useState(initialEmail);
+  const [loginPassword, setLoginPassword] = useState("");
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
-  const [debugInfo, setDebugInfo] = useState("");
   const [verificationUser, setVerificationUser] = useState<User | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -71,9 +72,6 @@ export function AuthForm({
     const usesGoogleProvider = user.providerData.some(
       (provider) => provider.providerId === "google.com",
     );
-    if (usesGoogleProvider) {
-      setDebugInfo("GOOGLE_AUTHENTICATED: sending Firebase ID token to server");
-    }
     if (!user.emailVerified && !usesGoogleProvider) {
       setVerificationUser(user);
       setError(
@@ -85,11 +83,6 @@ export function AuthForm({
     try {
       const result = await loginWithFirebaseAction(await user.getIdToken(true));
       if (result.registrationRequired && result.email) {
-        if (usesGoogleProvider) {
-          setDebugInfo(
-            "FIREBASE_TOKEN_VALIDATED: no Prisma profile; opening Google profile completion",
-          );
-        }
         const emailQuery = encodeURIComponent(result.email);
         router.push(
           result.googleRegistration
@@ -100,33 +93,17 @@ export function AuthForm({
       }
       if (result.error) {
         setError(result.error);
-        if (usesGoogleProvider) {
-          setDebugInfo(result.debug ?? "LOGIN_ACTION_FAILED_WITHOUT_DIAGNOSTIC");
-        }
         return;
       }
       if (result.success) {
-        if (usesGoogleProvider) setDebugInfo("LOGIN_SESSION_CREATED");
         router.replace("/dashboard");
         router.refresh();
         return;
       }
       setError("Não foi possível iniciar a sessão. Tente novamente.");
-      if (usesGoogleProvider) setDebugInfo("LOGIN_ACTION_RETURNED_NO_RESULT");
     } catch (signInError) {
       setError("Não foi possível validar sua conta. Tente novamente.");
-      if (usesGoogleProvider) {
-        const code =
-          typeof signInError === "object" &&
-          signInError !== null &&
-          "code" in signInError &&
-          typeof signInError.code === "string"
-            ? signInError.code
-            : signInError instanceof Error
-              ? signInError.name
-              : "UNKNOWN_ERROR";
-        setDebugInfo(`LOGIN_SERVER_ACTION_REJECTED:${code}`);
-      }
+      console.error("Firebase login client flow failed.", signInError);
     }
   }
 
@@ -145,7 +122,6 @@ export function AuthForm({
     setEmail(submittedEmail);
     setError("");
     setStatus("");
-    setDebugInfo("");
     setVerificationUser(null);
     startTransition(async () => {
       let user: User;
@@ -211,7 +187,6 @@ export function AuthForm({
   function submitGoogle() {
     setError("");
     setStatus("");
-    setDebugInfo("GOOGLE_POPUP_STARTED");
     startTransition(async () => {
       let user: User;
       try {
@@ -219,16 +194,7 @@ export function AuthForm({
         user = credential.user;
       } catch (authError) {
         setError(firebaseErrorMessage(authError));
-        const code =
-          typeof authError === "object" &&
-          authError !== null &&
-          "code" in authError &&
-          typeof authError.code === "string"
-            ? authError.code
-            : authError instanceof Error
-              ? authError.name
-              : "UNKNOWN_ERROR";
-        setDebugInfo(`GOOGLE_POPUP_FAILED:${code}`);
+        console.error("Firebase Google popup failed.", authError);
         return;
       }
       await completeSignIn(user);
@@ -291,19 +257,6 @@ export function AuthForm({
           {error}
         </p>
       )}
-      {debugInfo && (
-        <div
-          className="mb-5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-left"
-          role="status"
-        >
-          <p className="text-xs font-semibold uppercase tracking-wide text-amber-900">
-            Diagnóstico temporário do Google
-          </p>
-          <pre className="mt-2 whitespace-pre-wrap break-words font-mono text-xs text-amber-950">
-            {debugInfo}
-          </pre>
-        </div>
-      )}
       {status && (
         <p
           className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
@@ -361,19 +314,13 @@ export function AuthForm({
         </label>
 
         <div>
-          <label
-            className="block text-sm font-medium text-vitta-text"
-            htmlFor="auth-password"
-          >
-            Senha
-          </label>
-          <input
+          <PasswordInput
             autoComplete="current-password"
-            className="mt-2 w-full rounded-2xl border border-[#e9e3ed] bg-[#fcfbfd] px-4 py-3.5 text-vitta-text outline-none transition"
             id="auth-password"
+            label="Senha"
             name="password"
-            required
-            type="password"
+            onChange={setLoginPassword}
+            value={loginPassword}
           />
           <Link
             className="mt-2 inline-block text-xs font-semibold text-vitta hover:underline"
