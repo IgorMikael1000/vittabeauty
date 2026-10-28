@@ -257,6 +257,10 @@ export async function registerAction(
 
       return { success: "Cadastro realizado." };
     } catch (error) {
+      console.error(
+        "Prisma Professional.create failed while registering a Firebase user.",
+        error,
+      );
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2002"
@@ -273,7 +277,10 @@ export async function registerAction(
         if (duplicateEmail) return { error: "Este e-mail já está cadastrado." };
         continue;
       }
-      throw error;
+      return {
+        error:
+          "Não foi possível salvar seu cadastro agora. Tente novamente em instantes.",
+      };
     }
   }
 
