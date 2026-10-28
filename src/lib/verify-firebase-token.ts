@@ -72,8 +72,6 @@ export async function verifyFirebaseIdTokenWithDiagnostics(
     return { identity: null, diagnostic: "FIREBASE_JWT_EMAIL_VERIFIED_MISSING" };
   if (typeof payload.auth_time !== "number")
     return { identity: null, diagnostic: "FIREBASE_JWT_AUTH_TIME_MISSING" };
-  if (payload.token_use !== "id")
-    return { identity: null, diagnostic: "FIREBASE_JWT_TOKEN_USE_NOT_ID" };
   if (typeof firebase !== "object" || firebase === null)
     return { identity: null, diagnostic: "FIREBASE_CLAIMS_MISSING" };
   if (
