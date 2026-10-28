@@ -80,7 +80,7 @@ function TermsAcceptance({
         Li e concordo com os{" "}
         <a
           className="font-semibold text-vitta underline decoration-vitta/30 underline-offset-4 hover:decoration-vitta"
-          href="/termos-e-politica.txt"
+          href="/termos"
           rel="noreferrer"
           target="_blank"
         >
@@ -89,7 +89,7 @@ function TermsAcceptance({
         e a{" "}
         <a
           className="font-semibold text-vitta underline decoration-vitta/30 underline-offset-4 hover:decoration-vitta"
-          href="/termos-e-politica.txt"
+          href="/termos"
           rel="noreferrer"
           target="_blank"
         >
