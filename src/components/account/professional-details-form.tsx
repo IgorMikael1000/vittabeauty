@@ -144,7 +144,9 @@ export function ProfessionalDetailsForm({
         await verifyBeforeUpdateEmail(
           user,
           normalizedEmail,
-          getFirebaseActionCodeSettings("/auth/email-atualizado"),
+          getFirebaseActionCodeSettings(
+            "/dashboard/conta/dados?firebaseEmailUpdated=1",
+          ),
         );
         setEmailChangeRequested(true);
         setEditingEmail(false);

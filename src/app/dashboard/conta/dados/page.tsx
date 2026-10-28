@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ProfessionalDetailsForm } from "@/components/account/professional-details-form";
+import { FirebaseEmailChangeSync } from "@/components/account/firebase-email-change-sync";
 import { getAuthenticatedProfessionalId } from "@/lib/authenticated-professional";
 import { getPrismaClient } from "@/lib/prisma";
 
@@ -8,7 +9,15 @@ export const metadata: Metadata = {
   title: "Dados Pessoais",
 };
 
-export default async function AccountDetailsPage() {
+export default async function AccountDetailsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ firebaseEmailUpdated?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  const emailChanged = Array.isArray(params.firebaseEmailUpdated)
+    ? params.firebaseEmailUpdated[0] === "1"
+    : params.firebaseEmailUpdated === "1";
   const professionalId = await getAuthenticatedProfessionalId({
     allowExpired: true,
   });
@@ -40,6 +49,8 @@ export default async function AccountDetailsPage() {
       <p className="mt-2 text-sm leading-6 text-vitta-muted">
         Mantenha suas informações e seus dados de contato atualizados.
       </p>
+
+      {emailChanged && <FirebaseEmailChangeSync />}
 
       <div className="mt-7 rounded-[24px] border border-[#ebe5ef] bg-white/90 p-5 shadow-card sm:p-8">
         <ProfessionalDetailsForm professional={professional} />
