@@ -1,0 +1,451 @@
+VITTA BEAUTY
+TERMOS DE USO E POLITICA DE PRIVACIDADE
+
+VERSAO PARA REVISAO - NAO PUBLICAR SEM PREENCHER OS CAMPOS INDICADOS
+Data desta minuta: 28 de outubro de 2026
+
+IMPORTANTE
+Este texto foi preparado a partir das funcionalidades identificadas no codigo
+do Vitta Beauty. E uma minuta informativa, nao constitui parecer juridico e
+nao garante, por si so, conformidade legal ou ausencia de responsabilidade.
+Antes de publica-lo, o responsavel pela plataforma deve preencher os dados
+pendentes, confirmar as praticas reais de operacao e submete-lo a revisao de
+profissional juridico com experiencia em direito digital, consumidor e LGPD.
+
+IDENTIFICACAO DO RESPONSAVEL PELA PLATAFORMA
+Responsavel/mantenedor identificado na plataforma: I&T Solutions.
+Razao social: [PREENCHER]
+CNPJ/CPF: [PREENCHER]
+Endereco completo: [PREENCHER]
+E-mail de contato e privacidade: itsolutions0709@gmail.com
+Canal de suporte por WhatsApp indicado no aplicativo: +55 88 99311-8230
+Encarregado pelo tratamento de dados pessoais (se aplicavel): [PREENCHER]
+Data de vigencia apos aprovacao: [PREENCHER]
+
+======================================================================
+PARTE I - TERMOS DE USO
+======================================================================
+
+1. ACEITACAO E ESCOPO
+
+1.1. Estes Termos regulam o acesso e uso do Vitta Beauty, plataforma digital
+de gestao voltada a profissionais da beleza. O aplicativo oferece recursos
+como cadastro de clientes e servicos, agenda, link publico para solicitacao de
+agendamentos, controle financeiro, relatorios, gestao de assinatura e
+configuracao do perfil profissional.
+
+1.2. Ao criar uma conta, acessar ou usar os recursos autenticados, o usuario
+declara que leu e compreendeu estes Termos e a Politica de Privacidade. A
+plataforma deve apresentar estes documentos de forma acessivel antes da
+contratacao e registrar a versao aceita, a data e o usuario que aceitou.
+Atualmente, a existencia desse registro de aceite deve ser confirmada e
+implementada antes de se tratar o aceite como comprovado.
+
+1.3. O acesso ao link publico de agendamento nao exige que a cliente crie uma
+conta Vitta Beauty. Ao enviar uma solicitacao, a cliente reconhece que seus
+dados serao encaminhados ao profissional responsavel pelo link para tratar o
+pedido.
+
+2. CADASTRO E CONTA DO PROFISSIONAL
+
+2.1. O cadastro exige nome profissional ou nome do negocio, e-mail, CPF,
+telefone e especialidade. O acesso e autenticado pelo Firebase Authentication,
+com opcao de e-mail e senha ou Google. O e-mail deve ser verificado para
+liberar a sessao autenticada.
+
+2.2. O profissional deve fornecer dados verdadeiros, atualizados e sob seu
+controle, manter a confidencialidade de seus meios de acesso e comunicar ao
+suporte qualquer suspeita de uso indevido. O usuario e responsavel pelas
+operacoes feitas em sua conta, ressalvados os direitos previstos em lei e
+eventuais falhas imputaveis ao servico.
+
+2.3. A conta e destinada ao uso profissional. O usuario nao pode compartilhar
+credenciais de forma que comprometa a seguranca, tentar acessar contas ou
+dados de terceiros, interferir no funcionamento da plataforma, enviar codigo
+malicioso ou usar o servico para atividade ilegal.
+
+2.4. O usuario pode alterar dados de perfil e credenciais nos recursos
+disponiveis. A plataforma nao apresenta, no fluxo atualmente identificado, uma
+funcao automatica para excluir integralmente a conta. Para solicitar
+encerramento, exportacao ou exclusao de dados, utilize os canais de contato da
+Parte II, secao 7. A solicitacao sera analisada considerando vinculacoes,
+historico, direitos de terceiros e obrigacoes legais de conservacao.
+
+3. FUNCIONALIDADES E RESPONSABILIDADES DO PROFISSIONAL
+
+3.1. A plataforma fornece ferramentas de organizacao e nao substitui a
+prestacao dos servicos de beleza, o atendimento, a definicao de precos, a
+avaliacao profissional, a emissao de documentos fiscais ou o cumprimento de
+obrigacoes profissionais, tributarias, consumeristas e regulatorias do
+profissional.
+
+3.2. O profissional e responsavel por:
+- definir e manter corretos seus servicos, precos, duracoes, horarios,
+  intervalos, pausas, disponibilidade, dados de contato e chave PIX;
+- verificar e confirmar solicitacoes de horario. Uma solicitacao publica e
+  registrada inicialmente como pendente e nao equivale, por si so, a
+  confirmacao definitiva do atendimento;
+- informar diretamente a cliente as regras de confirmacao, atraso,
+  cancelamento, remarcacao, comparecimento, reembolso, sinal e demais
+  condicoes do servico antes de ela contratar ou pagar;
+- responder pela qualidade, seguranca, adequacao e execucao do servico
+  contratado diretamente com a cliente;
+- ter base legal e fornecer informacao adequada para inserir dados de
+  clientes, inclusive observacoes, no Vitta Beauty;
+- corrigir, atualizar ou remover dados de clientes quando cabivel e respeitar
+  os direitos das pessoas a quem os dados se referem.
+
+3.3. A agenda, os relatorios e os calculos dependem das informacoes fornecidas
+pelo usuario. O profissional deve conferir os registros e manter controles
+proprios necessarios a sua atividade.
+
+4. AGENDAMENTOS PUBLICOS, SINAIS E RELACAO COM CLIENTES
+
+4.1. O link publico apresenta servicos ativos habilitados para agendamento
+online e horarios calculados conforme expediente configurado, pausas,
+agendamentos e bloqueios registrados. A disponibilidade pode mudar antes de
+uma solicitacao ser gravada; em caso de conflito, a cliente deve escolher
+outro horario.
+
+4.2. A solicitacao publica pode coletar nome, WhatsApp, servico, data,
+horario e observacoes. O registro e associado ao profissional cujo link foi
+acessado. O profissional e responsavel por contatar a cliente e informar se o
+horario foi aceito.
+
+4.3. Quando o profissional configura um sinal, o aplicativo pode exibir a
+chave PIX do proprio profissional e instrucoes relacionadas ao pagamento.
+O Vitta Beauty nao recebe, custodia, liquida nem confirma esse pagamento PIX
+entre cliente e profissional. A cliente paga diretamente ao profissional,
+que e responsavel por confirmar o recebimento, prestar informacoes sobre
+cancelamento e reembolso e cumprir suas obrigacoes legais.
+
+4.4. O Vitta Beauty nao e parte do contrato de servico de beleza entre
+profissional e cliente e nao define a politica individual de cancelamento,
+remarcacao, sinal, comparecimento ou reembolso do profissional. Essas regras
+devem ser informadas pelo profissional de forma clara e previa, sem afastar
+direitos obrigatorios da cliente.
+
+4.5. O recurso de WhatsApp abre um servico de terceiro e pode preparar uma
+mensagem com informacoes do atendimento. O envio ocorre conforme a acao do
+usuario no WhatsApp; os termos e a politica desse servico tambem se aplicam.
+
+5. PLANOS, COBRANCAS E MERCADO PAGO
+
+5.1. O aplicativo apresenta atualmente estes precos de referencia:
+- Mensal: R$ 19,90, com rotulo "por mes";
+- Semestral: R$ 99,50, com rotulo "a cada 6 meses";
+- Anual: R$ 209,90, com rotulo "por ano".
+Os recursos indicam trial de tres dias e liberacao de acesso apos confirmacao
+do pagamento. Preco, periodicidade, tributos, forma de cobranca, renovacao,
+cancelamento e eventuais condicoes promocionais devem ser confirmados no
+checkout antes da compra.
+
+5.2. Os pagamentos da assinatura sao processados pelo Mercado Pago. O Vitta
+Beauty registra informacoes de pagamento e status recebidos para identificar
+transacoes e atualizar o acesso. Dados de cartao e credenciais de pagamento
+devem ser fornecidos diretamente ao Mercado Pago; a plataforma nao deve
+solicita-los em formularios proprios.
+
+5.3. A implementacao inclui retorno e notificacoes de pagamentos, atualizacao
+de prazo de acesso e tratamento de cancelamento informado pelo Mercado Pago.
+O codigo nao demonstra com clareza suficiente se cada plano e pagamento
+unico ou cobranca recorrente, nem oferece um fluxo completo de cancelamento
+ao usuario. Essa condicao deve ser confirmada, apresentada no checkout e
+descrita aqui antes da publicacao. Nao presuma renovacao automatica se ela nao
+estiver claramente informada e autorizada.
+
+5.4. O cancelamento da assinatura do Vitta Beauty e diferente do cancelamento
+de um agendamento ou de um servico de beleza. Antes da publicacao, informar o
+canal efetivo para cancelar, quando o acesso sera encerrado e como solicitar
+estorno. Direitos de arrependimento, reembolso e protecao do consumidor
+previstos em lei permanecem aplicaveis. A falta de uma funcao no aplicativo
+nao elimina esses direitos.
+
+5.5. Uma falha temporaria de confirmacao do provedor de pagamento pode atrasar
+a atualizacao do plano. O usuario deve contatar o suporte, apresentando
+comprovante e identificador da transacao sem enviar dados completos de cartao
+ou senha.
+
+6. DISPONIBILIDADE, LIMITES E SEGURANCA
+
+6.1. O Vitta Beauty busca manter seus recursos disponiveis, mas podem ocorrer
+interrupcoes para manutencao, atualizacoes, falhas de rede, indisponibilidade
+de fornecedores ou eventos fora do controle razoavel do responsavel.
+
+6.2. A plataforma oferece ferramentas de apoio e nao garante disponibilidade
+ininterrupta, ausencia de erros, resultado financeiro, quantidade de clientes
+ou sucesso comercial. Esta clausula nao exclui garantias ou responsabilidades
+que nao possam ser limitadas pela legislacao aplicavel.
+
+6.3. O usuario deve manter meios proprios para operacao e registros
+essenciais. A plataforma nao substitui backup independente, agenda
+alternativa, comprovantes fiscais ou controles exigidos por lei.
+
+6.4. A plataforma pode restringir ou suspender acesso em caso de risco a
+seguranca, fraude, violacao destes Termos, ordem legal ou inadimplencia,
+observados os direitos aplicaveis, a comunicacao possivel e a oportunidade de
+regularizacao quando cabivel.
+
+7. PROPRIEDADE INTELECTUAL E USO ACEITAVEL
+
+7.1. A interface, marca, software, textos e elementos do Vitta Beauty
+pertencem aos respectivos titulares ou licenciantes. Estes Termos concedem ao
+usuario uma licenca limitada, revogavel e nao exclusiva para usar a plataforma
+durante o periodo de acesso, sem transferir propriedade intelectual.
+
+7.2. O usuario mantem os direitos sobre os dados e conteudos que inserir,
+mas autoriza o tratamento tecnico necessario para hospedar, processar e exibir
+esses dados no servico, conforme a Politica de Privacidade.
+
+8. ALTERACOES, ENCERRAMENTO E LEI APLICAVEL
+
+8.1. Alteracoes materiais destes Termos devem ser comunicadas antes de sua
+vigencia, com nova versao e data. Quando exigido, sera solicitado novo aceite.
+O usuario pode deixar de usar o servico e solicitar encerramento pelos canais
+indicados, respeitadas obrigacoes pendentes e direitos legais.
+
+8.2. Estes Termos sao interpretados conforme as leis da Republica Federativa
+do Brasil, inclusive legislacao de protecao de dados e defesa do consumidor.
+Fica preservado o foro legalmente competente e os direitos de consumidores
+previstos em lei.
+
+======================================================================
+PARTE II - POLITICA DE PRIVACIDADE
+======================================================================
+
+1. QUEM TRATA OS DADOS E EM QUE PAPEL
+
+1.1. O responsavel/mantenedor do Vitta Beauty identificado no inicio deste
+documento trata dados para criar contas, autenticar usuarios, operar a
+plataforma, administrar assinaturas, proteger o servico e prestar suporte.
+Sua razao social, CNPJ/CPF e endereco devem ser preenchidos antes da
+publicacao.
+
+1.2. O profissional que usa o Vitta Beauty decide quais dados de clientes
+insere, para quais atendimentos os utiliza e por quanto tempo precisa
+conserva-los. Em relacao a esses dados de clientes, o profissional pode ser
+controlador e a plataforma pode atuar como operadora em nome dele, conforme
+as circunstancias reais e os contratos aplicaveis. Para dados da conta,
+seguranca, suporte e cobranca do proprio Vitta Beauty, o responsavel pela
+plataforma pode atuar como controlador. A qualificacao juridica definitiva
+deve ser validada com assessoria juridica e refletida em contrato de
+tratamento de dados entre plataforma e profissionais.
+
+1.3. A cliente que fornece dados pelo link publico deve consultar tambem as
+informacoes de privacidade do profissional que recebera sua solicitacao. O
+profissional e responsavel por explicar o uso dos dados no contexto do
+atendimento.
+
+2. QUAIS DADOS PODEM SER TRATADOS
+
+2.1. Dados de conta profissional:
+- nome profissional ou nome do negocio, e-mail, CPF, telefone e especialidade;
+- identificador de usuario Firebase, estado de verificacao do e-mail,
+  identificadores tecnicos de autenticacao e sessao;
+- slug publico, fuso horario, foto/logo em WebP, chave PIX e configuracoes
+  profissionais;
+- estado do plano, datas de acesso, identificadores e metadados de pagamento.
+
+2.2. Dados de clientes cadastrados pelo profissional ou enviados no
+agendamento publico:
+- nome, WhatsApp, servico preferido e observacoes;
+- data, horario, servico solicitado, historico e estado do agendamento;
+- informacoes necessarias ao atendimento e registros financeiros vinculados.
+Observacoes sao campos livres: nao inclua dados sensiveis, documentos,
+informacoes de saude ou dados de terceiros que nao sejam estritamente
+necessarios e legitimamente tratados.
+
+2.3. Dados operacionais e financeiros:
+- servicos, precos, custos de materiais, sinais, transacoes, categorias,
+  vencimentos, pagamentos, status de assinatura e registros de auditoria
+  administrativa;
+- informacoes tecnicas geradas na autenticacao, no funcionamento do servico,
+  na integracao de pagamentos e no suporte, quando registradas por provedores
+  ou logs da aplicacao.
+
+2.4. A plataforma nao deve coletar numero completo de cartao, codigo de
+seguranca ou senha do Mercado Pago. A autenticacao de senha e processada pelo
+Firebase Authentication. Nao envie senhas, chaves privadas ou documentos de
+identidade por canais de suporte.
+
+3. FINALIDADES E BASES LEGAIS
+
+3.1. Os dados podem ser tratados para:
+- criar e administrar conta, verificar e-mail, autenticar e proteger acesso;
+- disponibilizar agenda, cadastro de clientes, servicos, relatorios,
+  financeiro e link de agendamento;
+- encaminhar a solicitacao da cliente ao profissional e manter o historico
+  necessario a gestao do atendimento;
+- processar assinatura, confirmar pagamentos, atualizar acesso e prevenir
+  fraude;
+- prestar suporte, solucionar erros, manter integridade e seguranca,
+  cumprir obrigacoes legais e responder a solicitacoes de autoridades;
+- exercer ou defender direitos em processos e auditorias.
+
+3.2. Conforme a finalidade e o papel de cada agente, podem ser aplicaveis as
+bases legais previstas na Lei Geral de Protecao de Dados (LGPD), como
+execucao de contrato ou procedimentos preliminares, cumprimento de obrigacao
+legal ou regulatoria, exercicio regular de direitos, legitimo interesse
+avaliado caso a caso e consentimento quando necessario. A base legal de cada
+operacao deve ser documentada pelo controlador efetivo; o consentimento nao
+deve ser usado como justificativa generica para todo tratamento.
+
+4. COMPARTILHAMENTO E FORNECEDORES
+
+4.1. Os dados podem ser compartilhados estritamente conforme necessario com:
+- Firebase/Google, para autenticacao, identidade e gestao de sessao;
+- Neon/PostgreSQL, para armazenamento e operacao do banco de dados;
+- Vercel, para hospedagem, execucao da aplicacao e infraestrutura de entrega;
+- Mercado Pago, para checkout, processamento e notificacoes de pagamento da
+  assinatura do Vitta Beauty;
+- WhatsApp, quando o usuario escolhe abrir links ou enviar mensagens por esse
+  servico;
+- prestadores de suporte, seguranca, assessoria juridica e autoridades, nos
+  limites necessarios ou legalmente exigidos.
+
+4.2. Ao abrir o checkout do Mercado Pago ou o WhatsApp, o usuario interage
+com terceiros sujeitos a seus proprios termos e politicas. O Vitta Beauty nao
+controla integralmente os tratamentos realizados por esses terceiros.
+
+4.3. O responsavel nao vende dados pessoais. O compartilhamento deve ser
+limitado ao necessario para as finalidades informadas, observados contratos,
+controles de acesso e a legislacao aplicavel.
+
+4.4. A localizacao dos servidores e o regime de transferencias internacionais
+dependem das configuracoes e contratos dos fornecedores. Antes da publicacao,
+o responsavel deve confirmar regioes de armazenamento, suboperadores,
+mecanismos legais para transferencias internacionais e termos de tratamento
+de dados dos fornecedores efetivamente contratados.
+
+5. COOKIES, SESSAO, ARMAZENAMENTO LOCAL E PWA
+
+5.1. O Vitta Beauty usa cookie de sessao proprio, HTTP-only e SameSite=Lax,
+com validade prevista de cinco dias; em producao, ele e marcado como Secure.
+Esse cookie e necessario para autenticar e proteger as areas internas. Ele
+pode ser removido ao sair da conta ou quando expirar/revogar.
+
+5.2. O Firebase Client SDK pode utilizar armazenamento do navegador para
+manter o estado de autenticacao conforme suas configuracoes e o navegador.
+O aplicativo tambem usa armazenamento local para lembrar por sete dias que o
+usuario fechou o aviso de instalacao do PWA. Esse registro nao e usado, no
+codigo identificado, para publicidade.
+
+5.3. O service worker do PWA intercepta requisicoes GET da propria origem e
+encaminha-as a rede; o codigo atual nao implementa cache offline de paginas
+ou dados. A instalacao do app e opcional.
+
+5.4. A analise do codigo nao identificou ferramenta propria de analytics ou
+publicidade. Bibliotecas e provedores externos podem ter tratamentos tecnicos
+proprios, que devem ser verificados em suas configuracoes e documentos.
+
+5.5. Se futuramente forem adicionados cookies nao essenciais, publicidade,
+analytics ou rastreamento, esta Politica e a interface de preferencias devem
+ser atualizadas antes da ativacao, com consentimento quando exigido.
+
+6. ARMAZENAMENTO, SEGURANCA E RETENCAO
+
+6.1. O banco da aplicacao e PostgreSQL na Neon, acessado pelo servidor. O
+aplicativo implementa autenticacao por Firebase, cookie HTTP-only, verificacao
+de acesso no servidor, separacao de registros por profissional e validacao de
+notificacoes de pagamento. Essas medidas reduzem riscos, mas nao tornam
+qualquer sistema absolutamente seguro.
+
+6.2. O usuario deve proteger seus dispositivos, credenciais e dados de
+clientes, limitar acessos a pessoas autorizadas e avisar o suporte sobre
+incidentes suspeitos. O profissional nao deve inserir dados desnecessarios
+nem compartilhar credenciais.
+
+6.3. O codigo analisado nao define prazo geral de retencao nem exclui
+automaticamente os registros quando uma assinatura vence. Dados podem
+permanecer enquanto a conta estiver ativa e, depois, pelo tempo necessario a
+obrigacoes legais, conciliacao financeira, prevencao de fraude e exercicio de
+direitos. Os prazos concretos, criterios de anonimizar/excluir e backups
+devem ser definidos e publicados pelo responsavel antes da disponibilizacao
+definitiva.
+
+6.4. O encerramento ou expiracao do plano limita o acesso ao produto conforme
+as regras comerciais, mas nao significa necessariamente exclusao imediata dos
+dados. Pedidos de acesso, exportacao, correcao ou exclusao devem ser feitos
+pelo canal de privacidade. Dados sujeitos a conservacao legal ou necessarios a
+direitos de terceiros podem ser mantidos pelo periodo permitido, com acesso
+restrito.
+
+6.5. Em caso de incidente de seguranca envolvendo dados pessoais, o
+responsavel deve investigar, adotar medidas de contencao e comunicar os
+titulares e a Autoridade Nacional de Protecao de Dados (ANPD), quando exigido
+pela legislacao e regulamentacao aplicaveis.
+
+7. DIREITOS DOS TITULARES E CANAL DE PRIVACIDADE
+
+7.1. Nos termos da LGPD, o titular pode solicitar confirmacao de tratamento,
+acesso, correcao, anonimização, bloqueio ou eliminacao de dados excessivos ou
+tratados em desconformidade, portabilidade quando aplicavel, informacao sobre
+compartilhamento, revogacao de consentimento e revisao de decisoes
+automatizadas quando cabivel.
+
+7.2. Solicite atendimento pelo e-mail itsolutions0709@gmail.com, identificando
+o titular e o pedido. O suporte tambem pode ser contatado pelo WhatsApp
++55 88 99311-8230; para pedidos que envolvam dados pessoais, prefira o e-mail
+e nao envie documentos completos ou dados sensiveis sem instrucao segura.
+Poderao ser solicitadas informacoes proporcionais para confirmar identidade
+e evitar divulgacao a pessoa errada.
+
+7.3. Se o pedido se referir a dados de clientes mantidos pelo profissional,
+o responsavel pela plataforma podera encaminha-lo ao profissional controlador
+ou auxilia-lo conforme os acordos aplicaveis. O prazo e a resposta seguirao a
+LGPD e a regulamentacao vigente.
+
+7.4. Encarregado/DPO e contato especifico para titulares: [PREENCHER OU
+INFORMAR COMO CONTATAR O ENCARREGADO, SE APLICAVEL].
+
+8. CRIANCAS E ADOLESCENTES
+
+8.1. O Vitta Beauty e uma ferramenta de gestao profissional e nao foi
+identificado no produto um fluxo de verificacao de idade ou consentimento
+parental. O responsavel deve definir a idade minima para criar conta e
+implementar controles adequados antes da publicacao.
+
+8.2. Profissionais nao devem inserir dados de criancas ou adolescentes,
+especialmente informacoes sensiveis, salvo quando estritamente necessario,
+com fundamento legal, informacao adequada e observancia do melhor interesse,
+das regras da LGPD e do Estatuto da Crianca e do Adolescente. Quando exigido,
+deve ser obtido consentimento especifico e destacado do responsavel legal.
+
+9. ALTERACOES DESTA POLITICA
+
+9.1. Esta Politica pode ser atualizada para refletir mudancas de produto,
+fornecedores, leis ou operacao. A versao, a data de vigencia e um resumo das
+alteracoes materiais devem ser disponibilizados. Quando necessario, sera
+solicitado novo consentimento ou aceite.
+
+======================================================================
+PENDENCIAS OBRIGATORIAS ANTES DE PUBLICAR
+======================================================================
+
+[ ] Preencher razao social, CNPJ/CPF, endereco, responsavel e data de vigencia.
+[ ] Confirmar se o e-mail e WhatsApp informados sao canais oficiais para
+    solicitacoes LGPD e reclamações; criar um canal especifico se necessario.
+[ ] Definir controlador, operador, encarregado/DPO quando aplicavel e firmar
+    contrato de tratamento de dados com profissionais que inserem dados de
+    clientes.
+[ ] Definir e implementar exclusao/encerramento de conta, exportacao e prazos
+    de retencao, inclusive backups e registros financeiros.
+[ ] Confirmar com o Mercado Pago se cada plano gera pagamento unico ou
+    renovacao recorrente, como cancelar, quando cessa o acesso e qual a regra
+    de reembolso. Ajustar checkout, interface e estes Termos para que sejam
+    consistentes.
+[ ] Definir a politica de cancelamento, atraso, remarcacao e reembolso da
+    assinatura do Vitta Beauty, respeitando a legislacao do consumidor.
+[ ] Garantir que o profissional informa suas proprias regras de atendimento,
+    cancelamento e sinal antes da solicitacao/contratacao pela cliente.
+[ ] Confirmar os fornecedores/suboperadores efetivamente usados, localizacao
+    dos dados, transferencias internacionais, contratos, retencao de logs e
+    configuracoes Firebase, Neon, Vercel, Mercado Pago e WhatsApp.
+[ ] Implementar aceite explicito dos Termos/Politica no cadastro e registrar
+    versao, data, usuario e contexto do aceite; nao presumir que apenas
+    disponibilizar este arquivo equivale a aceite.
+[ ] Definir idade minima e controles para dados de menores.
+[ ] Revisar o documento com advogado e validar a operacao real antes de torna-lo
+    vinculante ou afirmar conformidade legal.
+
+FIM DO DOCUMENTO
