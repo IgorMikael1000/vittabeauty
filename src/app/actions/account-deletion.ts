@@ -7,11 +7,13 @@ import {
   getAccountDeletionErrorDetails,
   logAccountDeletionEvent,
 } from "@/lib/account-deletion-logger";
+import { processAccountDeletionJob } from "@/lib/account-deletion-worker";
 import { getPrismaClient } from "@/lib/prisma";
 import { verifyFirebaseIdToken } from "@/lib/verify-firebase-token";
 
 type DeleteAccountResult = {
   error?: string;
+  pending?: boolean;
   success?: string;
 };
 
@@ -244,6 +246,26 @@ export async function deleteProfessionalAccountAction(
     stage: "job_persistence",
     correlationId: jobId,
   });
+
+  let deletionCompleted = false;
+  try {
+    const result = await processAccountDeletionJob(jobId);
+    deletionCompleted = result === "completed";
+    logAccountDeletionEvent("request.processing_finished", {
+      outcome: deletionCompleted ? "success" : "failed",
+      stage: "immediate_deletion",
+      correlationId: jobId,
+      code: result === "already_processing" ? "JOB_ALREADY_PROCESSING" : undefined,
+    });
+  } catch (error) {
+    logAccountDeletionEvent("request.processing_failed", {
+      outcome: "failed",
+      stage: "immediate_deletion",
+      correlationId: jobId,
+      ...getAccountDeletionErrorDetails(error),
+    });
+  }
+
   try {
     await clearFirebaseSession();
   } catch (error) {
@@ -264,8 +286,11 @@ export async function deleteProfessionalAccountAction(
       ...getAccountDeletionErrorDetails(error),
     });
   }
-  return {
-    success:
-      "Sua solicitação de exclusão foi registrada. A remoção será concluída automaticamente em até 24 horas.",
-  };
+  return deletionCompleted
+    ? { success: "Sua conta foi excluída com sucesso." }
+    : {
+        success:
+          "Não foi possível concluir a exclusão agora. Sua solicitação ficará pendente e será tentada novamente automaticamente.",
+        pending: true,
+      };
 }

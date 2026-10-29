@@ -12,6 +12,7 @@ export default async function LoginPage({
     registered?: string;
     email?: string;
     accountDeleted?: string;
+    deletionPending?: string;
     emailChanged?: string;
     signOutFailed?: string;
   }>;
@@ -20,6 +21,7 @@ export default async function LoginPage({
     registered,
     email,
     accountDeleted,
+    deletionPending,
     emailChanged,
     signOutFailed,
   } = await searchParams;
@@ -27,6 +29,7 @@ export default async function LoginPage({
   return (
     <AuthForm
       accountDeleted={accountDeleted === "1"}
+      accountDeletionPending={deletionPending === "1"}
       emailChanged={emailChanged === "1"}
       firebaseSignOutFailed={signOutFailed === "1"}
       initialEmail={email}

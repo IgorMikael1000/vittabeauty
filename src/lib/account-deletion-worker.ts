@@ -78,6 +78,12 @@ async function deleteDatabaseRecords(
 
 type AccountDeletionResult = "completed" | "failed" | "already_processing";
 
+export async function processAccountDeletionJob(
+  jobId: string,
+): Promise<AccountDeletionResult> {
+  return processJob(jobId, new Date());
+}
+
 async function processJob(
   jobId: string,
   now: Date,

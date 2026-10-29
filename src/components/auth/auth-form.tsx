@@ -20,6 +20,7 @@ import { auth, googleProvider } from "@/lib/firebase";
 
 type AuthFormProps = {
   accountDeleted?: boolean;
+  accountDeletionPending?: boolean;
   emailChanged?: boolean;
   firebaseSignOutFailed?: boolean;
   registered?: boolean;
@@ -59,6 +60,7 @@ function firebaseErrorMessage(error: unknown): string {
 
 export function AuthForm({
   accountDeleted = false,
+  accountDeletionPending = false,
   emailChanged = false,
   firebaseSignOutFailed = false,
   registered = false,
@@ -253,8 +255,9 @@ export function AuthForm({
           className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
           role="status"
         >
-          Sua solicitação de exclusão foi registrada. A remoção será concluída
-          automaticamente em até 24 horas.
+          {accountDeletionPending
+            ? "Não foi possível concluir a exclusão agora. Sua solicitação ficará pendente e será tentada novamente automaticamente."
+            : "Sua conta foi excluída com sucesso."}
         </p>
       )}
       {error && (

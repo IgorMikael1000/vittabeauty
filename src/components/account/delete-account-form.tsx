@@ -140,7 +140,11 @@ export function DeleteAccountForm({
             signOutError,
           );
         });
-        router.replace("/login?accountDeleted=1");
+        router.replace(
+          result.pending
+            ? "/login?accountDeleted=1&deletionPending=1"
+            : "/login?accountDeleted=1",
+        );
         router.refresh();
       } catch (deleteError) {
         const code =
