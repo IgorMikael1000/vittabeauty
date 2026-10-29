@@ -14,6 +14,7 @@ import {
   parseDateTimeInTimezone,
 } from "@/lib/schedule";
 import { getPrismaClient } from "@/lib/prisma";
+import { getLiveModeDepositMaximumCents } from "@/lib/mercadopago-live-deposit-limit";
 import { AppointmentStatus } from "@/generated/prisma/client";
 import { getWhatsAppNumber } from "@/lib/whatsapp";
 import { getPublicBookingUrl } from "@/lib/public-url";
@@ -294,6 +295,7 @@ export default async function PublicBookingPage({
         dateStyle: "full",
       }).format(new Date(`${date}T12:00:00.000Z`))
     : null;
+  const liveModePixMaximumCents = getLiveModeDepositMaximumCents();
 
   return (
     <section className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
@@ -520,6 +522,11 @@ export default async function PublicBookingPage({
                         professional.mercadoPagoConnection?.liveMode === true &&
                         process.env.MERCADOPAGO_ALLOW_LIVE_MODE_DEPOSITS ===
                           "true"
+                      }
+                      liveModePixMaxAmount={
+                        liveModePixMaximumCents === null
+                          ? null
+                          : liveModePixMaximumCents / 100
                       }
                       slug={slug}
                       slots={slots}

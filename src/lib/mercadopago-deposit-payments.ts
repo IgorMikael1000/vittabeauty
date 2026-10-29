@@ -5,6 +5,10 @@ import {
   getMercadoPagoConnectedAccount,
   getMercadoPagoPaymentClient,
 } from "@/lib/mercadopago-connected-account";
+import {
+  getLiveModeDepositMaximumCents,
+  toDepositCents,
+} from "@/lib/mercadopago-live-deposit-limit";
 
 const DEPOSIT_REFERENCE_PREFIX = "vitta-deposit:";
 
@@ -59,12 +63,18 @@ export async function createMercadoPagoPixDeposit(input: {
   const connection = await getMercadoPagoConnectedAccount(
     input.professionalId,
   );
+  const liveModeDepositMaximumCents =
+    getLiveModeDepositMaximumCents();
   if (
     connection.liveMode &&
-    process.env.MERCADOPAGO_ALLOW_LIVE_MODE_DEPOSITS !== "true"
+    (process.env.MERCADOPAGO_ALLOW_LIVE_MODE_DEPOSITS !== "true" ||
+      liveModeDepositMaximumCents === null ||
+      !Number.isFinite(input.amount) ||
+      input.amount <= 0 ||
+      toDepositCents(input.amount) > liveModeDepositMaximumCents)
   ) {
     throw new Error(
-      "Pix deposits for production Mercado Pago accounts are disabled.",
+      "Pix deposit is blocked by the live-mode safety configuration.",
     );
   }
 

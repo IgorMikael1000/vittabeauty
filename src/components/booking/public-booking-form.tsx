@@ -13,6 +13,7 @@ type PublicBookingFormProps = {
   requiresPayerEmail: boolean;
   automaticPix: boolean;
   liveModePix: boolean;
+  liveModePixMaxAmount: number | null;
   date: string;
   timeZone: string;
   slots: AvailableSlot[];
@@ -26,6 +27,7 @@ export function PublicBookingForm({
   requiresPayerEmail,
   automaticPix,
   liveModePix,
+  liveModePixMaxAmount,
   date,
   timeZone,
   slots,
@@ -116,7 +118,10 @@ export function PublicBookingForm({
           role="alert"
         >
           Atenção: a conta Mercado Pago conectada está em produção. Esta
-          cobrança Pix pode movimentar dinheiro real.
+          cobrança Pix movimentará dinheiro real
+          {liveModePixMaxAmount === null
+            ? "; o limite de segurança não está configurado."
+            : ` e está limitada a R$ ${liveModePixMaxAmount.toFixed(2).replace(".", ",")}.`}
         </p>
       )}
 

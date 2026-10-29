@@ -24,6 +24,10 @@ import {
   RequestRateLimitUnavailableError,
 } from "@/lib/request-rate-limit";
 import { createMercadoPagoPixDeposit } from "@/lib/mercadopago-deposit-payments";
+import {
+  getLiveModeDepositMaximumCents,
+  toDepositCents,
+} from "@/lib/mercadopago-live-deposit-limit";
 
 class BookingUnavailableError extends Error {}
 
@@ -205,10 +209,35 @@ export async function createPublicBookingAction(
       : null;
   const allowsLiveModeDeposits =
     process.env.MERCADOPAGO_ALLOW_LIVE_MODE_DEPOSITS === "true";
+  const liveModeDepositMaximumCents =
+    getLiveModeDepositMaximumCents();
   const usesAutomaticPix = Boolean(
     mercadoPagoConnection &&
       (!mercadoPagoConnection.liveMode || allowsLiveModeDeposits),
   );
+
+  if (mercadoPagoConnection?.liveMode && !allowsLiveModeDeposits) {
+    return {
+      error:
+        "A conta Mercado Pago está em produção. A habilitação de cobranças reais está desativada.",
+    };
+  }
+
+  if (mercadoPagoConnection?.liveMode) {
+    if (liveModeDepositMaximumCents === null) {
+      return {
+        error: "O limite de segurança para cobranças reais não está configurado.",
+      };
+    }
+    if (toDepositCents(depositAmount) > liveModeDepositMaximumCents) {
+      const maximumAmount = (liveModeDepositMaximumCents / 100)
+        .toFixed(2)
+        .replace(".", ",");
+      return {
+        error: `O sinal excede o limite de segurança de R$ ${maximumAmount}.`,
+      };
+    }
+  }
 
   if (
     usesAutomaticPix &&
@@ -216,13 +245,6 @@ export async function createPublicBookingAction(
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payerEmail))
   ) {
     return { error: "Informe um e-mail válido para gerar o Pix." };
-  }
-
-  if (mercadoPagoConnection?.liveMode && !allowsLiveModeDeposits) {
-    return {
-      error:
-        "A conta Mercado Pago está em produção. A habilitação de cobranças reais está desativada.",
-    };
   }
 
   if (depositAmount > 0 && !usesAutomaticPix && !professional.pixKey) {

@@ -94,10 +94,13 @@ usa o refresh token rotativo; por isso, a autorização solicita
 contas, pois os tokens já salvos não poderão ser descriptografados.
 
 Por padrão, esta fase **cria cobranças somente quando a conexão OAuth é de teste**
-(`live_mode=false`). Para permitir cobranças com conexões OAuth de produção,
-configure `MERCADOPAGO_ALLOW_LIVE_MODE_DEPOSITS=true` no servidor. Isso pode
-movimentar dinheiro real; a página pública exibirá um aviso antes de solicitar
-o agendamento. Mantenha essa opção desativada durante testes. Configure
+(`live_mode=false`). Para um teste controlado com contas reais, configure
+`MERCADOPAGO_ALLOW_LIVE_MODE_DEPOSITS=true` e
+`MERCADOPAGO_LIVE_MODE_DEPOSIT_MAX_AMOUNT=1.00` no servidor. O teto limita cada
+sinal de produção a R$ 1,00; a página pública avisa que a cobrança movimenta
+dinheiro real. O valor precisa ser ajustado para um limite maior somente se
+necessário e conscientemente. Desative `MERCADOPAGO_ALLOW_LIVE_MODE_DEPOSITS`
+depois do teste. Configure
 `MERCADOPAGO_DEPOSIT_WEBHOOK_SECRET` com a chave de assinatura do webhook da
 aplicação e cadastre o endpoint
 `https://seu-dominio/api/webhooks/mercadopago/deposits` para notificações de
@@ -106,10 +109,26 @@ aplicação. O Pix expira em 30 minutos; só um pagamento aprovado e verificado
 diretamente na API do Mercado Pago confirma automaticamente o agendamento.
 Para gerar o Pix, a cliente informa o e-mail do pagador.
 
-Depois de aplicar as migrations pendentes, publique o app, conecte uma conta
-Mercado Pago de teste pelo endpoint acima e faça uma solicitação de agendamento
-com sinal. A conexão em modo de teste é recomendada. A tela pública mostra o
-QR Code e o copia e cola; após pagar, atualize a página para ver a confirmação.
+Depois de aplicar as migrations pendentes e publicar:
+
+1. Confirme que `MERCADOPAGO_CLIENT_ID` e `MERCADOPAGO_CLIENT_SECRET` pertencem
+   à aplicação Mercado Pago correta; para OAuth de uma conta profissional real,
+   use as credenciais de produção dessa aplicação. Não use Access Token no
+   lugar do Client Secret.
+2. Configure as duas variáveis de habilitação e o teto de R$ 1,00 acima na
+   Vercel, junto com a chave de assinatura do webhook. Faça um novo deploy.
+3. Reconecte a conta real da profissional pelo endpoint autenticado
+   `/api/integrations/mercadopago/connect`. O callback precisa informar
+   `live_mode=true`.
+4. Configure o serviço com sinal de R$ 1,00 ou menos. A cliente informa nome,
+   WhatsApp e um e-mail válido do pagador; esse e-mail não precisa ser o da
+   profissional. A cliente paga o QR Code usando uma conta bancária real, e o
+   valor será recebido pela conta Mercado Pago da profissional.
+5. Confira o QR Code, faça somente um pagamento de teste controlado e confirme
+   que o webhook atualizou o agendamento. Consulte a atividade da conta antes
+   de repetir qualquer tentativa.
+6. Ao terminar, defina `MERCADOPAGO_ALLOW_LIVE_MODE_DEPOSITS=false` e faça
+   redeploy. O limite é uma proteção extra, não um modo sandbox.
 
 ### Cloudinary para fotos de perfil
 
