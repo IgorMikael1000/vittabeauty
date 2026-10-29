@@ -8,6 +8,7 @@ import {
   sendEmailVerification,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signOut,
   type User,
 } from "firebase/auth";
 import {
@@ -19,6 +20,7 @@ import { auth, googleProvider } from "@/lib/firebase";
 
 type AuthFormProps = {
   accountDeletionPending?: boolean;
+  accountDeletionProcessing?: boolean;
   emailChanged?: boolean;
   firebaseSignOutFailed?: boolean;
   registered?: boolean;
@@ -58,6 +60,7 @@ function firebaseErrorMessage(error: unknown): string {
 
 export function AuthForm({
   accountDeletionPending = false,
+  accountDeletionProcessing = false,
   emailChanged = false,
   firebaseSignOutFailed = false,
   registered = false,
@@ -92,6 +95,21 @@ export function AuthForm({
             ? `/cadastro/complemento?email=${emailQuery}`
             : `/cadastro?email=${emailQuery}`,
         );
+        return;
+      }
+      if (result.accountDeletionPending || result.accountDeletionProcessing) {
+        await signOut(auth).catch((signOutError: unknown) => {
+          console.error(
+            "Could not clear Firebase client state during account deletion.",
+            signOutError,
+          );
+        });
+        router.replace(
+          result.accountDeletionPending
+            ? "/login?accountDeletionPending=1"
+            : "/login?accountDeletionProcessing=1",
+        );
+        router.refresh();
         return;
       }
       if (result.error) {
@@ -248,6 +266,15 @@ export function AuthForm({
         >
           Sua solicitação de exclusão foi registrada. O acesso está bloqueado e
           o processo automático tentará concluir a remoção dos dados.
+        </p>
+      )}
+      {accountDeletionProcessing && (
+        <p
+          className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          role="status"
+        >
+          A exclusão da sua conta está sendo processada. Se ocorrer algum erro,
+          o acesso será bloqueado e novas tentativas serão realizadas.
         </p>
       )}
       {error && (

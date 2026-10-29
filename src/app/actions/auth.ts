@@ -66,6 +66,8 @@ export async function loginWithFirebaseAction(
   registrationRequired?: boolean;
   email?: string;
   googleRegistration?: boolean;
+  accountDeletionPending?: boolean;
+  accountDeletionProcessing?: boolean;
   success?: boolean;
   error?: string;
 }> {
@@ -135,43 +137,25 @@ export async function loginWithFirebaseAction(
     const prisma = getPrismaClient();
     let professional = await prisma.professional.findUnique({
       where: { firebaseUid: identity.uid },
-      select: { id: true, email: true, firebaseUid: true },
+      select: {
+        id: true,
+        email: true,
+        firebaseUid: true,
+        deletionPendingAt: true,
+        deletionRequestedAt: true,
+      },
     });
-
-    if (professional && professional.email !== identity.email) {
-      const duplicateEmail = await prisma.professional.findUnique({
-        where: { email: identity.email },
-        select: { id: true },
-      });
-      if (duplicateEmail && duplicateEmail.id !== professional.id) {
-        return {
-          error: "Este e-mail já está vinculado a outra conta.",
-        };
-      }
-
-      try {
-        professional = await prisma.professional.update({
-          where: { id: professional.id },
-          data: { email: identity.email },
-          select: { id: true, email: true, firebaseUid: true },
-        });
-      } catch (error) {
-        if (
-          error instanceof Prisma.PrismaClientKnownRequestError &&
-          error.code === "P2002"
-        ) {
-          return {
-            error: "Este e-mail já está vinculado a outra conta.",
-          };
-        }
-        throw error;
-      }
-    }
 
     if (!professional) {
       professional = await prisma.professional.findUnique({
         where: { email: identity.email },
-        select: { id: true, email: true, firebaseUid: true },
+        select: {
+          id: true,
+          email: true,
+          firebaseUid: true,
+          deletionPendingAt: true,
+          deletionRequestedAt: true,
+        },
       });
     }
 
@@ -191,6 +175,57 @@ export async function loginWithFirebaseAction(
       return {
         error: "Este e-mail já está vinculado a outra conta Firebase.",
       };
+    }
+
+    if (professional.deletionPendingAt) {
+      logAuthEvent("login.account_deletion_pending", {
+        outcome: "rejected",
+        provider,
+      });
+      return { accountDeletionPending: true };
+    }
+    if (professional.deletionRequestedAt) {
+      logAuthEvent("login.account_deletion_processing", {
+        outcome: "rejected",
+        provider,
+      });
+      return { accountDeletionProcessing: true };
+    }
+
+    if (professional.email !== identity.email) {
+      const duplicateEmail = await prisma.professional.findUnique({
+        where: { email: identity.email },
+        select: { id: true },
+      });
+      if (duplicateEmail && duplicateEmail.id !== professional.id) {
+        return {
+          error: "Este e-mail já está vinculado a outra conta.",
+        };
+      }
+
+      try {
+        professional = await prisma.professional.update({
+          where: { id: professional.id },
+          data: { email: identity.email },
+          select: {
+            id: true,
+            email: true,
+            firebaseUid: true,
+            deletionPendingAt: true,
+            deletionRequestedAt: true,
+          },
+        });
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002"
+        ) {
+          return {
+            error: "Este e-mail já está vinculado a outra conta.",
+          };
+        }
+        throw error;
+      }
     }
 
     if (!professional.firebaseUid) {

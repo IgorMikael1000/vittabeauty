@@ -85,7 +85,12 @@ async function deleteDatabaseRecords(
   });
 }
 
-async function processJob(jobId: string, now: Date): Promise<boolean> {
+type AccountDeletionResult = "completed" | "failed" | "already_processing";
+
+async function processJob(
+  jobId: string,
+  now: Date,
+): Promise<AccountDeletionResult> {
   const prisma = getPrismaClient();
   const claim = await prisma.accountDeletionJob.updateMany({
     where: {
@@ -101,7 +106,7 @@ async function processJob(jobId: string, now: Date): Promise<boolean> {
       attempts: { increment: 1 },
     },
   });
-  if (claim.count !== 1) return false;
+  if (claim.count !== 1) return "already_processing";
 
   const job = await prisma.accountDeletionJob.findUnique({
     where: { id: jobId },
@@ -113,7 +118,7 @@ async function processJob(jobId: string, now: Date): Promise<boolean> {
       attempts: true,
     },
   });
-  if (!job) return false;
+  if (!job) return "already_processing";
 
   try {
     await removeFirebaseUser(job.firebaseUid);
@@ -123,20 +128,29 @@ async function processJob(jobId: string, now: Date): Promise<boolean> {
       correlationId: job.id,
       outcome: "success",
     });
-    return true;
+    return "completed";
   } catch (error) {
     const errorCode = getSafeErrorCode(error);
     const retryAt = new Date(
       now.getTime() + getAccountDeletionRetryDelayMs(job.attempts),
     );
-    await prisma.accountDeletionJob.updateMany({
-      where: { id: job.id, status: "PROCESSING" },
-      data: {
-        status: "PENDING",
-        nextAttemptAt: retryAt,
-        lockedUntil: null,
-        lastErrorCode: errorCode,
-      },
+    await prisma.$transaction(async (transaction) => {
+      await transaction.professional.updateMany({
+        where: {
+          id: job.professionalId,
+          deletionPendingAt: null,
+        },
+        data: { deletionPendingAt: now },
+      });
+      await transaction.accountDeletionJob.updateMany({
+        where: { id: job.id, status: "PROCESSING" },
+        data: {
+          status: "PENDING",
+          nextAttemptAt: retryAt,
+          lockedUntil: null,
+          lastErrorCode: errorCode,
+        },
+      });
     });
     console.error("[account-deletion] Deletion retry scheduled.", {
       correlationId: job.id,
@@ -144,7 +158,7 @@ async function processJob(jobId: string, now: Date): Promise<boolean> {
       retryAt: retryAt.toISOString(),
       code: errorCode,
     });
-    return false;
+    return "failed";
   }
 }
 
@@ -168,7 +182,7 @@ export async function processPendingAccountDeletions(): Promise<{
 
   let completed = 0;
   for (const job of jobs) {
-    if (await processJob(job.id, now)) completed += 1;
+    if ((await processJob(job.id, now)) === "completed") completed += 1;
   }
 
   return { processed: jobs.length, completed };

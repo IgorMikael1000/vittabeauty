@@ -143,7 +143,9 @@ export function DeleteAccountForm({
         router.replace(
           result.pending
             ? "/login?accountDeletionPending=1"
-            : "/login?accountDeleted=1",
+            : result.processing
+              ? "/login?accountDeletionProcessing=1"
+              : "/login?accountDeleted=1",
         );
         router.refresh();
       } catch (deleteError) {

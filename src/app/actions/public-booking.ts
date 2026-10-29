@@ -83,7 +83,11 @@ export async function createPublicBookingAction(
 
   const prisma = getPrismaClient();
   const professional = await prisma.professional.findUnique({
-    where: { slug, deletionPendingAt: null },
+    where: {
+      slug,
+      deletionPendingAt: null,
+      deletionRequestedAt: null,
+    },
     select: { id: true, timezone: true, pixKey: true, expiresAt: true },
   });
 

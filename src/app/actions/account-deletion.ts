@@ -10,6 +10,7 @@ import { verifyFirebaseIdToken } from "@/lib/verify-firebase-token";
 type DeleteAccountResult = {
   error?: string;
   pending?: boolean;
+  processing?: boolean;
   success?: string;
 };
 
@@ -72,6 +73,7 @@ export async function deleteProfessionalAccountAction(
       id: true,
       email: true,
       cpf: true,
+      deletionRequestedAt: true,
       deletionPendingAt: true,
       logoUrl: true,
     },
@@ -88,6 +90,7 @@ export async function deleteProfessionalAccountAction(
   const nowSeconds = Math.floor(Date.now() / 1000);
   if (
     !professional.deletionPendingAt &&
+    !professional.deletionRequestedAt &&
     (identity.authTime > nowSeconds + 30 ||
       nowSeconds - identity.authTime > 5 * 60)
   ) {
@@ -122,11 +125,11 @@ export async function deleteProfessionalAccountAction(
     return { error: "O e-mail ou CPF informado não corresponde ao cadastro." };
   }
 
-  const requestedAt = new Date();
   const cloudinaryPublicId = getCloudinaryPublicId(
     professional.id,
     professional.logoUrl,
   );
+  const requestedAt = new Date();
   let jobId: string;
 
   try {
@@ -134,9 +137,9 @@ export async function deleteProfessionalAccountAction(
       await transaction.professional.updateMany({
         where: {
           id: professional.id,
-          deletionPendingAt: null,
+          deletionRequestedAt: null,
         },
-        data: { deletionPendingAt: requestedAt },
+        data: { deletionRequestedAt: requestedAt },
       });
 
       const existingJob = await transaction.accountDeletionJob.findUnique({
@@ -166,15 +169,14 @@ export async function deleteProfessionalAccountAction(
     };
   }
 
-  await clearFirebaseSession();
-  revalidatePath("/", "layout");
   logAuthEvent("account.deletion_requested", {
     outcome: "started",
     correlationId: jobId,
   });
+  await clearFirebaseSession();
+  revalidatePath("/", "layout");
   return {
-    pending: true,
-    success:
-      "Solicitação registrada. O acesso foi bloqueado e a exclusão será concluída automaticamente.",
+    processing: true,
+    success: "Solicitação registrada e a exclusão será processada automaticamente.",
   };
 }
