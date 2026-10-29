@@ -1,18 +1,19 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { createAppointmentAction } from "@/app/actions/calendar";
 import type { FormState } from "@/app/actions/auth";
+import { ClientAutocomplete } from "@/components/calendar/client-autocomplete";
 import { FormFeedback } from "@/components/forms/form-feedback";
 
 const initialState: FormState = {};
 
 type ScheduleFormsProps = {
-  clients: Array<{ id: string; name: string; whatsapp: string }>;
   services: Array<{ id: string; name: string; durationMinutes: number }>;
 };
 
-export function ScheduleForms({ clients, services }: ScheduleFormsProps) {
+export function ScheduleForms({ services }: ScheduleFormsProps) {
+  const [hasSelectedClient, setHasSelectedClient] = useState(false);
   const [appointmentState, appointmentAction, appointmentPending] =
     useActionState(createAppointmentAction, initialState);
 
@@ -29,21 +30,7 @@ export function ScheduleForms({ clients, services }: ScheduleFormsProps) {
         </summary>
         <form action={appointmentAction} className="space-y-4 border-t border-vitta-border p-5 sm:p-6">
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block text-sm font-medium text-vitta-text">
-              Cliente
-              <select
-                className="mt-1.5 w-full rounded-xl border border-vitta-border bg-white px-3 py-2.5 outline-none focus:border-vitta focus:ring-2 focus:ring-vitta/15"
-                name="clientId"
-                required
-              >
-                <option value="">Selecione um cliente</option>
-                {clients.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.name} · {client.whatsapp}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <ClientAutocomplete onSelectionChange={setHasSelectedClient} />
             <label className="block text-sm font-medium text-vitta-text">
               Serviço
               <select
@@ -78,11 +65,6 @@ export function ScheduleForms({ clients, services }: ScheduleFormsProps) {
               rows={2}
             />
           </label>
-          {clients.length === 0 && (
-            <p className="text-sm text-amber-800">
-              Cadastre um cliente antes de criar um atendimento.
-            </p>
-          )}
           {services.length === 0 && (
             <p className="text-sm text-amber-800">
               Cadastre um serviço ativo antes de criar um atendimento.
@@ -92,7 +74,7 @@ export function ScheduleForms({ clients, services }: ScheduleFormsProps) {
           <button
             className="rounded-xl bg-vitta px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-vitta/90 disabled:opacity-60"
             disabled={
-              appointmentPending || clients.length === 0 || services.length === 0
+              appointmentPending || !hasSelectedClient || services.length === 0
             }
             type="submit"
           >

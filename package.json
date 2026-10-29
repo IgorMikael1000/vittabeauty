@@ -11,6 +11,7 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
+    "db:indexes:client-search": "prisma db execute --file prisma/client-search-indexes.sql",
     "postinstall": "prisma generate"
   },
   "dependencies": {

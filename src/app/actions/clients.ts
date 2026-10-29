@@ -5,6 +5,49 @@ import { revalidatePath } from "next/cache";
 import { getAuthenticatedProfessionalId } from "@/lib/authenticated-professional";
 import { getPrismaClient } from "@/lib/prisma";
 import type { FormState } from "@/app/actions/auth";
+import {
+  escapeClientSearchPattern,
+  normalizeClientWhatsapp,
+  normalizeClientName,
+} from "@/lib/client-normalization";
+
+const clientSearchResultLimit = 10;
+
+export async function searchClientsAction(
+  rawQuery: string,
+): Promise<Array<{ id: string; name: string; whatsapp: string }>> {
+  const professionalId = await getAuthenticatedProfessionalId({
+    allowExpired: true,
+  });
+  const query = typeof rawQuery === "string" ? rawQuery.trim().slice(0, 100) : "";
+  if (query.length < 2) {
+    return [];
+  }
+
+  const prisma = getPrismaClient();
+  const digits = normalizeClientWhatsapp(query);
+  const normalizedName = escapeClientSearchPattern(normalizeClientName(query));
+  const phonePattern = digits.length >= 3 ? `${digits}%` : "";
+
+  return prisma.$queryRaw<
+    Array<{ id: string; name: string; whatsapp: string }>
+  >`
+    SELECT "id", "name", "whatsapp"
+    FROM "Client"
+    WHERE "professionalId" = ${professionalId}
+      AND (
+        lower(regexp_replace(btrim("name"), '[[:space:]]+', ' ', 'g'))
+          LIKE ${`${normalizedName}%`} ESCAPE chr(92)
+        ${digits.length >= 3
+          ? Prisma.sql`OR regexp_replace("whatsapp", '[^0-9]', '', 'g') LIKE ${phonePattern}`
+          : Prisma.empty}
+      )
+    ORDER BY
+      lower(regexp_replace(btrim("name"), '[[:space:]]+', ' ', 'g')) ASC,
+      "id" ASC
+    LIMIT ${clientSearchResultLimit}
+  `;
+}
 
 function readClientFields(formData: FormData) {
   const name = formData.get("name");
@@ -25,7 +68,7 @@ function readClientFields(formData: FormData) {
   const normalizedWhatsapp = whatsapp.trim();
   const normalizedNotes = notes?.trim() || null;
   const normalizedServiceId = preferredServiceId?.trim() || null;
-  const digits = normalizedWhatsapp.replace(/\D/g, "");
+  const digits = normalizeClientWhatsapp(normalizedWhatsapp);
 
   if (normalizedName.length < 2 || normalizedName.length > 100) {
     return { error: "O nome deve ter entre 2 e 100 caracteres." } as const;

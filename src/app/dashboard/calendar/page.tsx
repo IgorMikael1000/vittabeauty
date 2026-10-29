@@ -63,7 +63,7 @@ export default async function CalendarPage({
     select: { timezone: true, name: true },
   });
   const range = getCalendarRange(params.date, params.view, professional.timezone);
-  const [appointments, blocks, clients, services] = await Promise.all([
+  const [appointments, blocks, services] = await Promise.all([
       prisma.appointment.findMany({
         where: {
           professionalId,
@@ -81,11 +81,6 @@ export default async function CalendarPage({
           startsAt: { gte: range.start, lt: range.end },
         },
         orderBy: { startsAt: "asc" },
-      }),
-      prisma.client.findMany({
-        where: { professionalId },
-        orderBy: { name: "asc" },
-        select: { id: true, name: true, whatsapp: true },
       }),
       prisma.service.findMany({
         where: {
@@ -369,10 +364,7 @@ export default async function CalendarPage({
         </div>
 
         <aside className="min-w-0">
-          <ScheduleForms
-            clients={clients}
-            services={services}
-          />
+          <ScheduleForms services={services} />
         </aside>
       </div>
     </section>

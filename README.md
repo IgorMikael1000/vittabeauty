@@ -37,7 +37,12 @@ I&T Solutions com Next.js, TypeScript, Tailwind CSS, Prisma e PostgreSQL na Neon
 
    ```powershell
    npm run db:push
+   npm run db:indexes:client-search
    ```
+
+   O segundo comando cria índices de expressão usados pela busca de clientes
+   na agenda e pelo vínculo de clientes em agendamentos públicos. Execute-o
+   também uma vez no banco de produção após sincronizar o schema.
 
 5. Inicie o servidor de desenvolvimento:
 

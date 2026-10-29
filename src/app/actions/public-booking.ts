@@ -15,6 +15,10 @@ import {
   parseDateTimeInTimezone,
 } from "@/lib/schedule";
 import { getPrismaClient } from "@/lib/prisma";
+import {
+  normalizeClientName,
+  normalizeClientWhatsapp,
+} from "@/lib/client-normalization";
 
 class BookingUnavailableError extends Error {}
 
@@ -46,7 +50,7 @@ export async function createPublicBookingAction(
   }
 
   const name = nameInput.trim();
-  const whatsapp = whatsappInput.replace(/\D/g, "");
+  const whatsapp = normalizeClientWhatsapp(whatsappInput);
 
   if (name.length < 2 || name.length > 100) {
     return { error: "O nome deve ter entre 2 e 100 caracteres." };
@@ -207,23 +211,31 @@ export async function createPublicBookingAction(
           );
         }
 
-        const existingClients = await transaction.client.findMany({
-          where: { professionalId: professional.id },
-          select: { id: true, name: true, whatsapp: true },
-        });
-        const existingClientByWhatsapp = existingClients.find(
-          (client) => client.whatsapp.replace(/\D/g, "") === whatsapp,
-        );
-        const normalizedName = name.toLocaleLowerCase("pt-BR").replace(/\s+/g, " ");
-        const existingClientByName = existingClients.find(
-          (client) =>
-            client.name
-              .trim()
-              .toLocaleLowerCase("pt-BR")
-              .replace(/\s+/g, " ") === normalizedName,
-        );
+        const existingClientByWhatsapp = await transaction.$queryRaw<
+          Array<{ id: string; name: string; whatsapp: string }>
+        >`
+          SELECT "id", "name", "whatsapp"
+          FROM "Client"
+          WHERE "professionalId" = ${professional.id}
+            AND regexp_replace("whatsapp", '[^0-9]', '', 'g') = ${whatsapp}
+          ORDER BY "createdAt" ASC
+          LIMIT 1
+        `;
+        const existingClientByName = existingClientByWhatsapp.length
+          ? []
+          : await transaction.$queryRaw<
+              Array<{ id: string; name: string; whatsapp: string }>
+            >`
+              SELECT "id", "name", "whatsapp"
+              FROM "Client"
+              WHERE "professionalId" = ${professional.id}
+                AND lower(regexp_replace(btrim("name"), '[[:space:]]+', ' ', 'g')) =
+                    ${normalizeClientName(name)}
+              ORDER BY "createdAt" ASC
+              LIMIT 1
+            `;
         const existingClient =
-          existingClientByWhatsapp ?? existingClientByName;
+          existingClientByWhatsapp[0] ?? existingClientByName[0];
         const client = existingClient
           ? { id: existingClient.id, name: existingClient.name }
           : await transaction.client.create({

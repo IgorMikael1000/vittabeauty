@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { ClientForm } from "@/components/clients/client-form";
 import { DeleteClientForm } from "@/components/clients/delete-client-form";
 import { getAuthenticatedProfessionalId } from "@/lib/authenticated-professional";
@@ -9,6 +10,10 @@ import { getWhatsAppNumber } from "@/lib/whatsapp";
 export const metadata: Metadata = {
   title: "Clientes",
 };
+
+const clientPageSize = 25;
+const maximumClientPage =
+  Math.floor(Number.MAX_SAFE_INTEGER / clientPageSize) - 1;
 
 const appointmentStatusLabels = {
   PENDING: "Pendente",
@@ -21,13 +26,19 @@ const appointmentStatusLabels = {
 export default async function ClientsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; page?: string }>;
 }) {
   const professionalId = await getAuthenticatedProfessionalId({
     allowExpired: true,
   });
-  const { q: rawQuery } = await searchParams;
+  const params = await searchParams;
+  const rawQuery = params.q;
   const query = rawQuery?.trim().slice(0, 100) ?? "";
+  const pageValue = Number(params.page);
+  const page =
+    Number.isSafeInteger(pageValue) && pageValue > 0
+      ? Math.min(pageValue, maximumClientPage)
+      : 1;
   const prisma = getPrismaClient();
   const [professional, services, clients] = await Promise.all([
     prisma.professional.findUniqueOrThrow({
@@ -51,7 +62,9 @@ export default async function ClientsPage({
             }
           : {}),
       },
-      orderBy: { name: "asc" },
+      orderBy: [{ name: "asc" }, { id: "asc" }],
+      skip: (page - 1) * clientPageSize,
+      take: clientPageSize + 1,
       include: {
         preferredService: { select: { id: true, name: true, isActive: true } },
         appointments: {
@@ -65,6 +78,9 @@ export default async function ClientsPage({
       },
     }),
   ]);
+  const hasNextPage =
+    page < maximumClientPage && clients.length > clientPageSize;
+  const visibleClients = clients.slice(0, clientPageSize);
   const selectableServices = services.map((service) => ({
     id: service.id,
     name: service.isActive ? service.name : `${service.name} (inativo)`,
@@ -108,7 +124,7 @@ export default async function ClientsPage({
           </form>
 
           <div className="space-y-4">
-            {clients.length === 0 ? (
+            {visibleClients.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-vitta-border bg-white p-8 text-center">
                 <h2 className="font-semibold text-vitta-text">
                   {query ? "Nenhum cliente encontrado" : "Sua lista está vazia"}
@@ -120,7 +136,7 @@ export default async function ClientsPage({
                 </p>
               </div>
             ) : (
-              clients.map((client) => (
+              visibleClients.map((client) => (
                 <article
                   className="rounded-2xl border border-vitta-border bg-white p-5 shadow-card sm:p-6"
                   key={client.id}
@@ -220,8 +236,43 @@ export default async function ClientsPage({
               ))
             )}
           </div>
+          {(page > 1 || hasNextPage) && (
+            <nav
+              aria-label="Paginação de clientes"
+              className="mt-6 flex items-center justify-between gap-4"
+            >
+              {page > 1 ? (
+                <Link
+                  className="rounded-xl border border-vitta-border bg-white px-4 py-2 text-sm font-medium text-vitta-text hover:bg-vitta-background"
+                  href={getClientPageHref(query, page - 1)}
+                >
+                  Anterior
+                </Link>
+              ) : (
+                <span />
+              )}
+              <span className="text-sm text-vitta-muted">Página {page}</span>
+              {hasNextPage ? (
+                <Link
+                  className="rounded-xl border border-vitta-border bg-white px-4 py-2 text-sm font-medium text-vitta-text hover:bg-vitta-background"
+                  href={getClientPageHref(query, page + 1)}
+                >
+                  Próxima
+                </Link>
+              ) : (
+                <span />
+              )}
+            </nav>
+          )}
         </div>
       </div>
     </section>
   );
+}
+
+function getClientPageHref(query: string, page: number): string {
+  const params = new URLSearchParams();
+  if (query) params.set("q", query);
+  params.set("page", String(page));
+  return `/dashboard/clients?${params.toString()}`;
 }
