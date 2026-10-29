@@ -87,6 +87,7 @@ export default async function CalendarPage({
         include: {
           client: { select: { name: true, whatsapp: true } },
           service: { select: { name: true } },
+          depositPayment: { select: { status: true } },
         },
       }),
       prisma.calendarBlock.findMany({
@@ -328,6 +329,13 @@ export default async function CalendarPage({
                                 ]}
                               </span>
                             </div>
+                            {entry.appointment.status === "CONFIRMED" &&
+                              entry.appointment.depositPayment?.status ===
+                                "approved" && (
+                                <span className="mt-2 inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+                                  Sinal Pago
+                                </span>
+                              )}
                             <p className="mt-2 text-sm text-vitta-muted">
                               {entry.appointment.service.name}
                             </p>

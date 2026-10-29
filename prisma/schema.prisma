@@ -31,6 +31,11 @@ enum ProfessionalRole {
   ADMIN
 }
 
+enum PixDepositMode {
+  MANUAL
+  AUTOMATIC
+}
+
 enum AccountDeletionJobStatus {
   PENDING
   PROCESSING
@@ -45,6 +50,7 @@ model Professional {
   phone                      String?                     @unique
   specialty                  String?
   pixKey                     String?
+  pixDepositMode             PixDepositMode              @default(MANUAL)
   logoUrl                    String?                     @db.Text
   subscriptionStatus         String                      @default("TRIAL")
   planType                   String                      @default("FREE")

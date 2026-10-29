@@ -5,6 +5,36 @@ import { getAuthenticatedProfessionalId } from "@/lib/authenticated-professional
 import { getPrismaClient } from "@/lib/prisma";
 import type { FormState } from "@/app/actions/auth";
 
+class PixModeConfigurationError extends Error {}
+
+export async function selectAutomaticPixDepositModeAction(
+  _previousState: FormState,
+  _formData: FormData,
+): Promise<FormState> {
+  void _previousState;
+  void _formData;
+  const professionalId = await getAuthenticatedProfessionalId();
+  const prisma = getPrismaClient();
+  const connection = await prisma.mercadoPagoConnection.findUnique({
+    where: { professionalId },
+    select: { id: true },
+  });
+  if (!connection) {
+    return {
+      error: "Conecte uma conta Mercado Pago para ativar o sinal automático.",
+    };
+  }
+
+  await prisma.professional.update({
+    where: { id: professionalId },
+    data: { pixDepositMode: "AUTOMATIC" },
+  });
+  revalidatePath("/dashboard/services");
+  revalidatePath("/dashboard/services/signal");
+  revalidatePath("/agendar/[slug]", "page");
+  return { success: "Sinal automático ativado." };
+}
+
 export async function saveServiceAction(
   _previousState: FormState,
   formData: FormData,
@@ -62,7 +92,11 @@ export async function saveServiceAction(
 
   const professional = await getPrismaClient().professional.findUnique({
     where: { id: professionalId },
-    select: { pixKey: true },
+    select: {
+      pixKey: true,
+      pixDepositMode: true,
+      mercadoPagoConnection: { select: { id: true } },
+    },
   });
   if (!professional) {
     return { error: "Profissional não encontrado." };
@@ -79,9 +113,23 @@ export async function saveServiceAction(
     };
   }
 
-  if (!professional.pixKey && Number(normalizedDepositAmount) > 0) {
+  if (
+    Number(normalizedDepositAmount) > 0 &&
+    professional.pixDepositMode === "MANUAL" &&
+    !professional.pixKey
+  ) {
     return {
-      error: "Cadastre sua chave PIX antes de configurar um sinal para o serviço.",
+      error: "Configure a forma de recebimento do sinal antes de salvar o serviço.",
+    };
+  }
+
+  if (
+    Number(normalizedDepositAmount) > 0 &&
+    professional.pixDepositMode === "AUTOMATIC" &&
+    !professional.mercadoPagoConnection
+  ) {
+    return {
+      error: "Conecte uma conta Mercado Pago para receber sinais automaticamente.",
     };
   }
 
@@ -133,12 +181,13 @@ export async function saveServiceAction(
   return { success: serviceId ? "Serviço atualizado." : "Serviço cadastrado." };
 }
 
-export async function savePixKeyAction(
+export async function configureManualPixDepositAction(
   _previousState: FormState,
   formData: FormData,
 ): Promise<FormState> {
   const professionalId = await getAuthenticatedProfessionalId();
   const pixKeyValue = formData.get("pixKey");
+  const confirmedDisconnect = formData.get("confirmDisconnect") === "on";
 
   if (typeof pixKeyValue !== "string") {
     return { error: "Informe uma chave PIX válida." };
@@ -149,14 +198,58 @@ export async function savePixKeyAction(
     return { error: "A chave PIX deve ter entre 3 e 200 caracteres." };
   }
 
-  await getPrismaClient().professional.update({
-    where: { id: professionalId },
-    data: { pixKey },
-  });
+  const prisma = getPrismaClient();
+  try {
+    await prisma.$transaction(async (transaction) => {
+      const connection = await transaction.mercadoPagoConnection.findUnique({
+        where: { professionalId },
+        select: { id: true },
+      });
+
+      if (connection && !confirmedDisconnect) {
+        throw new PixModeConfigurationError(
+          "Confirme a desconexão da conta Mercado Pago para usar o modo manual.",
+        );
+      }
+
+      if (connection) {
+        const pendingPayments =
+          await transaction.appointmentDepositPayment.count({
+            where: {
+              professionalId,
+              status: { in: ["creating", "pending"] },
+              expiresAt: { gt: new Date() },
+            },
+          });
+        if (pendingPayments > 0) {
+          throw new PixModeConfigurationError(
+            "Há cobranças Pix automáticas pendentes. Aguarde expirarem antes de desconectar a conta.",
+          );
+        }
+
+        await transaction.mercadoPagoConnection.delete({
+          where: { professionalId },
+        });
+      }
+
+      await transaction.professional.update({
+        where: { id: professionalId },
+        data: { pixKey, pixDepositMode: "MANUAL" },
+      });
+    });
+  } catch (error) {
+    if (error instanceof PixModeConfigurationError) {
+      return { error: error.message };
+    }
+    throw error;
+  }
 
   revalidatePath("/dashboard/services");
+  revalidatePath("/dashboard/services/signal");
   revalidatePath("/agendar/[slug]", "page");
-  return { success: "Chave PIX salva." };
+  return {
+    success: "Sinal manual configurado. A confirmação do pagamento será manual.",
+  };
 }
 
 export async function toggleServiceActiveAction(

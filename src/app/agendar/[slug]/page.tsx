@@ -3,6 +3,8 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { PublicBookingForm } from "@/components/booking/public-booking-form";
 import { PublicBookingDateCalendar } from "@/components/booking/public-booking-date-calendar";
+import { CopyPixCodeButton } from "@/components/booking/copy-pix-code-button";
+import { RefreshPixStatus } from "@/components/booking/refresh-pix-status";
 import {
   buildAvailableSlots,
   getDayBounds,
@@ -14,7 +16,6 @@ import {
   parseDateTimeInTimezone,
 } from "@/lib/schedule";
 import { getPrismaClient } from "@/lib/prisma";
-import { getLiveModeDepositMaximumCents } from "@/lib/mercadopago-live-deposit-limit";
 import { AppointmentStatus } from "@/generated/prisma/client";
 import { getWhatsAppNumber } from "@/lib/whatsapp";
 import { getPublicBookingUrl } from "@/lib/public-url";
@@ -99,8 +100,9 @@ export default async function PublicBookingPage({
       timezone: true,
       expiresAt: true,
       pixKey: true,
+      pixDepositMode: true,
       phone: true,
-      mercadoPagoConnection: { select: { liveMode: true } },
+      mercadoPagoConnection: { select: { id: true } },
       services: {
         where: { isActive: true, onlineBookingEnabled: true },
         orderBy: { name: "asc" },
@@ -155,6 +157,7 @@ export default async function PublicBookingPage({
             startsAt: true,
             depositAmount: true,
             status: true,
+            client: { select: { name: true } },
             depositPayment: {
               select: {
                 status: true,
@@ -178,7 +181,10 @@ export default async function PublicBookingPage({
   const depositValue = Number(successfulBooking?.depositAmount ?? 0);
   const depositPayment = successfulBooking?.depositPayment ?? null;
   const whatsappMessage = successfulBooking && bookingDateTime
-    ? `Olá! Acabei de solicitar o serviço ${successfulBooking.service.name} para ${bookingDateTime} no Vitta Beauty. Segue o comprovante do sinal de ${currency.format(depositValue)}.`
+    ? depositPayment?.status === "approved" &&
+      successfulBooking.status === AppointmentStatus.CONFIRMED
+      ? `Olá! O sinal do meu agendamento já foi pago. Cliente: ${successfulBooking.client.name}. Serviço: ${successfulBooking.service.name}. Data e hora: ${bookingDateTime}.`
+      : `Olá! Acabei de solicitar o serviço ${successfulBooking.service.name} para ${bookingDateTime} no Vitta Beauty. Segue o comprovante do sinal de ${currency.format(depositValue)}.`
     : "";
   const whatsappHref =
     successfulBooking &&
@@ -295,8 +301,6 @@ export default async function PublicBookingPage({
         dateStyle: "full",
       }).format(new Date(`${date}T12:00:00.000Z`))
     : null;
-  const liveModePixMaximumCents = getLiveModeDepositMaximumCents();
-
   return (
     <section className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
       <div className="overflow-hidden rounded-2xl border border-vitta-border bg-white shadow-card">
@@ -326,16 +330,34 @@ export default async function PublicBookingPage({
               className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950"
               role="status"
             >
-              <p>
-                Sua solicitação foi enviada.
+              <p className="font-semibold">
+                {successfulBooking?.status === AppointmentStatus.CONFIRMED &&
+                depositPayment?.status === "approved"
+                  ? "Agendamento confirmado com sucesso!"
+                  : "Sua solicitação foi enviada."}
               </p>
               {successfulBooking && depositValue > 0 && depositPayment && (
                 <div className="space-y-3 border-t border-emerald-200 pt-4">
                   {depositPayment.status === "approved" &&
                   successfulBooking.status === AppointmentStatus.CONFIRMED ? (
-                    <p className="font-semibold">
-                      Pix confirmado! Seu agendamento está confirmado.
-                    </p>
+                    <div className="space-y-3">
+                      <p>
+                        Sinal pago e confirmado. Serviço:{" "}
+                        <strong>{successfulBooking.service.name}</strong>.
+                        <br />
+                        Data e hora: <strong>{bookingDateTime}</strong>.
+                      </p>
+                      {whatsappHref && (
+                        <a
+                          className="inline-flex w-full items-center justify-center rounded-xl bg-[#25D366] px-4 py-3 text-center font-semibold text-white transition hover:bg-[#1fb95a]"
+                          href={whatsappHref}
+                          rel="noopener noreferrer"
+                          target="_blank"
+                        >
+                          Avisar a profissional pelo WhatsApp
+                        </a>
+                      )}
+                    </div>
                   ) : depositPayment.status === "approved" ? (
                     <p className="font-semibold">
                       O Pix foi recebido, mas não foi possível confirmar
@@ -373,11 +395,14 @@ export default async function PublicBookingPage({
                           value={depositPayment.qrCode}
                         />
                       </label>
+                      <CopyPixCodeButton value={depositPayment.qrCode} />
                       <p>
-                        Após o pagamento, esta solicitação será confirmada
-                        automaticamente. Atualize esta página para consultar o
-                        status.
+                        Após o pagamento, o agendamento será confirmado
+                        automaticamente.
                       </p>
+                      <RefreshPixStatus
+                        expiresAt={depositPayment.expiresAt.toISOString()}
+                      />
                     </>
                   ) : (
                     <p className="font-medium">
@@ -505,28 +530,13 @@ export default async function PublicBookingPage({
                       serviceId={selectedService.id}
                       requiresPayerEmail={
                         Number(selectedService.depositAmount ?? 0) > 0 &&
-                        professional.mercadoPagoConnection !== null &&
-                        (!professional.mercadoPagoConnection.liveMode ||
-                          process.env.MERCADOPAGO_ALLOW_LIVE_MODE_DEPOSITS ===
-                            "true")
+                        professional.pixDepositMode === "AUTOMATIC" &&
+                        professional.mercadoPagoConnection !== null
                       }
                       automaticPix={
                         Number(selectedService.depositAmount ?? 0) > 0 &&
-                        professional.mercadoPagoConnection !== null &&
-                        (!professional.mercadoPagoConnection.liveMode ||
-                          process.env.MERCADOPAGO_ALLOW_LIVE_MODE_DEPOSITS ===
-                            "true")
-                      }
-                      liveModePix={
-                        Number(selectedService.depositAmount ?? 0) > 0 &&
-                        professional.mercadoPagoConnection?.liveMode === true &&
-                        process.env.MERCADOPAGO_ALLOW_LIVE_MODE_DEPOSITS ===
-                          "true"
-                      }
-                      liveModePixMaxAmount={
-                        liveModePixMaximumCents === null
-                          ? null
-                          : liveModePixMaximumCents / 100
+                        professional.pixDepositMode === "AUTOMATIC" &&
+                        professional.mercadoPagoConnection !== null
                       }
                       slug={slug}
                       slots={slots}

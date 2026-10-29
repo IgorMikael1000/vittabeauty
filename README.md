@@ -75,7 +75,7 @@ diferenças.
 Para produção, aplique as migrations pendentes com `npm run db:migrate:deploy`
 antes de disponibilizar a versão correspondente.
 
-### Teste de Pix de sinal via Mercado Pago OAuth
+### Sinal de agendamento via Pix
 
 A conexão OAuth é iniciada somente pelo endpoint autenticado
 `/api/integrations/mercadopago/connect`; ainda não há botão no painel.
@@ -91,44 +91,37 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 O callback salva os tokens OAuth criptografados com AES-256-GCM e a renovação
 usa o refresh token rotativo; por isso, a autorização solicita
 `offline_access`. Nunca altere a chave de criptografia depois de conectar
-contas, pois os tokens já salvos não poderão ser descriptografados.
+contas sem reconectá-las.
 
-Por padrão, esta fase **cria cobranças somente quando a conexão OAuth é de teste**
-(`live_mode=false`). Para um teste controlado com contas reais, configure
-`MERCADOPAGO_ALLOW_LIVE_MODE_DEPOSITS=true` e
-`MERCADOPAGO_LIVE_MODE_DEPOSIT_MAX_AMOUNT=1.00` no servidor. O teto limita cada
-sinal de produção a R$ 1,00; a página pública avisa que a cobrança movimenta
-dinheiro real. O valor precisa ser ajustado para um limite maior somente se
-necessário e conscientemente. Desative `MERCADOPAGO_ALLOW_LIVE_MODE_DEPOSITS`
-depois do teste. Configure
+Na página `/dashboard/services/signal`, a profissional escolhe entre:
+
+- **Sinal automático**: conectar uma conta Mercado Pago. O Vitta cria a
+  cobrança Pix, mostra QR Code e copia e cola, e confirma o horário após
+  verificar o pagamento na API do Mercado Pago. O serviço informa a taxa de
+  0,99% definida para esta integração.
+- **Sinal manual**: cadastrar uma chave Pix de qualquer banco. A cliente paga
+  fora do Vitta e a profissional confere o recebimento antes de confirmar o
+  agendamento manualmente.
+
+A forma do sinal é compartilhada por todos os serviços. Ao trocar de automático
+para manual, a conta Mercado Pago é desconectada do Vitta e seus tokens locais
+são removidos. A troca é impedida enquanto houver cobranças automáticas
+pendentes, para que o webhook ainda possa validá-las.
+
+Configure
 `MERCADOPAGO_DEPOSIT_WEBHOOK_SECRET` com a chave de assinatura do webhook da
 aplicação e cadastre o endpoint
 `https://seu-dominio/api/webhooks/mercadopago/deposits` para notificações de
 pagamentos. A URL `NEXT_PUBLIC_APP_URL` deve apontar para a origem pública da
 aplicação. O Pix expira em 30 minutos; só um pagamento aprovado e verificado
 diretamente na API do Mercado Pago confirma automaticamente o agendamento.
-Para gerar o Pix, a cliente informa o e-mail do pagador.
+A cliente informa um e-mail válido para cobranças automáticas. Esse e-mail é
+do pagador e não precisa ser o da profissional.
 
-Depois de aplicar as migrations pendentes e publicar:
-
-1. Confirme que `MERCADOPAGO_CLIENT_ID` e `MERCADOPAGO_CLIENT_SECRET` pertencem
-   à aplicação Mercado Pago correta; para OAuth de uma conta profissional real,
-   use as credenciais de produção dessa aplicação. Não use Access Token no
-   lugar do Client Secret.
-2. Configure as duas variáveis de habilitação e o teto de R$ 1,00 acima na
-   Vercel, junto com a chave de assinatura do webhook. Faça um novo deploy.
-3. Reconecte a conta real da profissional pelo endpoint autenticado
-   `/api/integrations/mercadopago/connect`. O callback precisa informar
-   `live_mode=true`.
-4. Configure o serviço com sinal de R$ 1,00 ou menos. A cliente informa nome,
-   WhatsApp e um e-mail válido do pagador; esse e-mail não precisa ser o da
-   profissional. A cliente paga o QR Code usando uma conta bancária real, e o
-   valor será recebido pela conta Mercado Pago da profissional.
-5. Confira o QR Code, faça somente um pagamento de teste controlado e confirme
-   que o webhook atualizou o agendamento. Consulte a atividade da conta antes
-   de repetir qualquer tentativa.
-6. Ao terminar, defina `MERCADOPAGO_ALLOW_LIVE_MODE_DEPOSITS=false` e faça
-   redeploy. O limite é uma proteção extra, não um modo sandbox.
+Depois de aplicar as migrations pendentes e publicar, conecte a conta Mercado
+Pago real da profissional pelo fluxo na configuração do sinal, defina o valor
+do sinal nos serviços e faça uma cobrança controlada. Pagamentos de produção
+movimentam dinheiro real.
 
 ### Cloudinary para fotos de perfil
 

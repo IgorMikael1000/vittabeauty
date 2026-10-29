@@ -25,7 +25,11 @@ export default async function ServicesPage() {
     }),
     prisma.professional.findUniqueOrThrow({
       where: { id: professionalId },
-      select: { pixKey: true },
+      select: {
+        pixKey: true,
+        pixDepositMode: true,
+        mercadoPagoConnection: { select: { id: true } },
+      },
     }),
   ]);
 
@@ -43,7 +47,13 @@ export default async function ServicesPage() {
 
       <div className="mt-7 grid gap-6 lg:grid-cols-[minmax(280px,360px)_1fr]">
         <aside className="h-fit rounded-2xl border border-vitta-border bg-white p-5 shadow-card sm:p-6">
-          <ServiceForm hasPixKey={Boolean(professional.pixKey)} />
+          <ServiceForm
+            hasPixConfiguration={
+              professional.pixDepositMode === "AUTOMATIC"
+                ? Boolean(professional.mercadoPagoConnection)
+                : Boolean(professional.pixKey)
+            }
+          />
         </aside>
 
         <div className="space-y-4">
@@ -123,7 +133,11 @@ export default async function ServicesPage() {
                         onlineBookingEnabled: service.onlineBookingEnabled,
                         isActive: service.isActive,
                       }}
-                      hasPixKey={Boolean(professional.pixKey)}
+                      hasPixConfiguration={
+                        professional.pixDepositMode === "AUTOMATIC"
+                          ? Boolean(professional.mercadoPagoConnection)
+                          : Boolean(professional.pixKey)
+                      }
                     />
                     <div>
                       <p className="mb-3 text-sm leading-6 text-vitta-muted">

@@ -1,5 +1,6 @@
 import { errors, jwtVerify } from "jose";
 import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 import { getCurrentProfessionalId } from "@/lib/authenticated-professional";
 import {
   getMercadoPagoOAuthConfiguration,
@@ -83,9 +84,10 @@ export async function GET(request: Request): Promise<Response> {
       400,
     );
   }
+  const authorizedProfessionalId = statePayload.professionalId;
 
   const currentProfessionalId = await getCurrentProfessionalId();
-  if (currentProfessionalId !== statePayload.professionalId) {
+  if (currentProfessionalId !== authorizedProfessionalId) {
     return textResponse(
       "A sessão mudou ou expirou. Entre novamente e inicie a conexão pelo link.",
       401,
@@ -186,6 +188,9 @@ export async function GET(request: Request): Promise<Response> {
   const accessToken = tokenData.access_token;
   const refreshToken = tokenData.refresh_token;
   const accountId = String(tokenData.user_id);
+  const expiresIn = tokenData.expires_in;
+  const liveMode = tokenData.live_mode;
+  const scopes = tokenData.scope;
 
   let accountResponse: Response;
   try {
@@ -260,31 +265,38 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   try {
-    await getPrismaClient().mercadoPagoConnection.upsert({
-      where: { professionalId: statePayload.professionalId },
-      create: {
-        professionalId: statePayload.professionalId,
-        accountId,
-        accessTokenEncrypted: encryptedAccessToken,
-        refreshTokenEncrypted: encryptedRefreshToken,
-        tokenExpiresAt: new Date(
-          Date.now() + tokenData.expires_in * 1000,
-        ),
-        liveMode: tokenData.live_mode,
-        scopes: tokenData.scope,
-        connectedAt: new Date(),
-      },
-      update: {
-        accountId,
-        accessTokenEncrypted: encryptedAccessToken,
-        refreshTokenEncrypted: encryptedRefreshToken,
-        tokenExpiresAt: new Date(
-          Date.now() + tokenData.expires_in * 1000,
-        ),
-        liveMode: tokenData.live_mode,
-        scopes: tokenData.scope,
-        connectedAt: new Date(),
-      },
+    const prisma = getPrismaClient();
+    await prisma.$transaction(async (transaction) => {
+      await transaction.mercadoPagoConnection.upsert({
+        where: { professionalId: authorizedProfessionalId },
+        create: {
+          professionalId: authorizedProfessionalId,
+          accountId,
+          accessTokenEncrypted: encryptedAccessToken,
+          refreshTokenEncrypted: encryptedRefreshToken,
+          tokenExpiresAt: new Date(
+            Date.now() + expiresIn * 1000,
+          ),
+          liveMode,
+          scopes,
+          connectedAt: new Date(),
+        },
+        update: {
+          accountId,
+          accessTokenEncrypted: encryptedAccessToken,
+          refreshTokenEncrypted: encryptedRefreshToken,
+          tokenExpiresAt: new Date(
+            Date.now() + expiresIn * 1000,
+          ),
+          liveMode,
+          scopes,
+          connectedAt: new Date(),
+        },
+      });
+      await transaction.professional.update({
+        where: { id: authorizedProfessionalId },
+        data: { pixDepositMode: "AUTOMATIC" },
+      });
     });
   } catch (error) {
     console.error("[mercadopago-oauth] Failed to save the account connection.", {
@@ -296,8 +308,8 @@ export async function GET(request: Request): Promise<Response> {
     );
   }
 
-  return textResponse(
-    `Conta Mercado Pago conectada e tokens protegidos com sucesso. ID da conta: ${accountId}. Ambiente: ${tokenData.live_mode ? "produção" : "teste"}.`,
-    200,
+  return NextResponse.redirect(
+    new URL("/dashboard/services/signal?connected=1", url.origin),
+    { status: 303 },
   );
 }

@@ -1,9 +1,12 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { savePixKeyAction, saveServiceAction } from "@/app/actions/services";
+import Link from "next/link";
+import { Settings2 } from "lucide-react";
+import { useActionState } from "react";
+import { saveServiceAction } from "@/app/actions/services";
 import type { FormState } from "@/app/actions/auth";
 import { FormFeedback } from "@/components/forms/form-feedback";
+import { CurrencyInput } from "@/components/services/currency-input";
 
 export type ServiceFormValues = {
   id?: string;
@@ -21,36 +24,17 @@ const initialState: FormState = {};
 
 export function ServiceForm({
   service,
-  hasPixKey: initialHasPixKey,
+  hasPixConfiguration,
 }: {
   service?: ServiceFormValues;
-  hasPixKey: boolean;
+  hasPixConfiguration: boolean;
 }) {
-  const [hasPixKey, setHasPixKey] = useState(initialHasPixKey);
-  const [isPixDialogOpen, setIsPixDialogOpen] = useState(false);
   const [state, formAction, pending] = useActionState(
     saveServiceAction,
     initialState,
   );
-  const [pixState, setPixState] = useState(initialState);
-  const [pixPending, setPixPending] = useState(false);
-
-  async function handlePixKeySave(formData: FormData) {
-    setPixPending(true);
-    try {
-      const result = await savePixKeyAction(initialState, formData);
-      setPixState(result);
-      if (result.success) {
-      setHasPixKey(true);
-      setIsPixDialogOpen(false);
-      }
-    } finally {
-      setPixPending(false);
-    }
-  }
 
   return (
-    <>
     <form action={formAction} className="space-y-4">
       {service?.id && (
         <input name="serviceId" type="hidden" value={service.id} />
@@ -68,28 +52,39 @@ export function ServiceForm({
           defaultValue={service?.name ?? ""}
         />
       </label>
-      <label className="block text-sm font-medium text-vitta-text">
-        Valor do Sinal (R$ - Opcional)
-        <input
-          className="mt-1.5 w-full rounded-xl border border-vitta-border px-3 py-2.5 outline-none focus:border-vitta focus:ring-2 focus:ring-vitta/15 disabled:cursor-not-allowed disabled:bg-vitta-background disabled:text-vitta-muted"
-          disabled={!hasPixKey}
-          min="0"
-          max={service?.price}
-          name="depositAmount"
-          step="0.01"
-          type="number"
-          defaultValue={service?.depositAmount ?? "0"}
-        />
-        {!hasPixKey && (
-          <button
-            className="mt-2 text-left text-xs font-semibold text-vitta underline decoration-vitta/40 underline-offset-2 hover:text-vitta/80"
-            onClick={() => setIsPixDialogOpen(true)}
-            type="button"
+      <div>
+        <div className="flex items-center justify-between gap-2">
+          <p className="block text-sm font-medium text-vitta-text">
+            Valor do sinal
+          </p>
+          {hasPixConfiguration && (
+            <Link
+              aria-label="Configurar forma do sinal"
+              className="rounded-lg p-1.5 text-vitta-muted transition hover:bg-vitta-background hover:text-vitta"
+              href="/dashboard/services/signal"
+              title="Configurar forma do sinal"
+            >
+              <Settings2 aria-hidden="true" size={18} />
+            </Link>
+          )}
+        </div>
+        <div className="mt-1.5">
+          <CurrencyInput
+            className={`w-full rounded-xl border border-vitta-border px-3 py-2.5 outline-none focus:border-vitta focus:ring-2 focus:ring-vitta/15 disabled:cursor-not-allowed disabled:bg-vitta-background disabled:text-vitta-muted`}
+            defaultValue={service?.depositAmount ?? "0"}
+            disabled={!hasPixConfiguration}
+            name="depositAmount"
+          />
+        </div>
+        {!hasPixConfiguration && (
+          <Link
+            className="mt-2 inline-block text-xs font-semibold text-vitta underline decoration-vitta/40 underline-offset-2 hover:text-vitta/80"
+            href="/dashboard/services/signal"
           >
-            Para exigir sinal, cadastre sua Chave PIX primeiro
-          </button>
+            Configurar sinal
+          </Link>
         )}
-      </label>
+      </div>
       <label className="block text-sm font-medium text-vitta-text">
         Descrição
         <textarea
@@ -103,14 +98,11 @@ export function ServiceForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-sm font-medium text-vitta-text">
           Preço (R$)
-          <input
+          <CurrencyInput
             className="mt-1.5 w-full rounded-xl border border-vitta-border px-3 py-2.5 outline-none focus:border-vitta focus:ring-2 focus:ring-vitta/15"
-            min="0.01"
+            defaultValue={service?.price ?? ""}
             name="price"
             required
-            step="0.01"
-            type="number"
-            defaultValue={service?.price ?? ""}
           />
         </label>
         <label className="block text-sm font-medium text-vitta-text">
@@ -177,69 +169,5 @@ export function ServiceForm({
         {pending ? "Salvando..." : service ? "Salvar alterações" : "Cadastrar serviço"}
       </button>
     </form>
-    {isPixDialogOpen && (
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
-        onMouseDown={(event) => {
-          if (event.target === event.currentTarget && !pixPending) {
-            setIsPixDialogOpen(false);
-          }
-        }}
-      >
-        <section
-          aria-labelledby="pix-dialog-title"
-          aria-modal="true"
-          className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl sm:p-6"
-          role="dialog"
-        >
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2
-                className="text-lg font-semibold text-vitta-text"
-                id="pix-dialog-title"
-              >
-                Cadastrar chave PIX
-              </h2>
-              <p className="mt-1 text-sm leading-5 text-vitta-muted">
-                Esta chave será exibida às clientes que precisarem pagar um
-                sinal para solicitar o agendamento.
-              </p>
-            </div>
-            <button
-              aria-label="Fechar"
-              className="rounded-lg px-2 py-1 text-vitta-muted hover:bg-vitta-background disabled:opacity-50"
-              disabled={pixPending}
-              onClick={() => setIsPixDialogOpen(false)}
-              type="button"
-            >
-              ×
-            </button>
-          </div>
-          <form action={handlePixKeySave} className="mt-5 space-y-4">
-            <label className="block text-sm font-medium text-vitta-text">
-              Chave PIX
-              <input
-                autoComplete="off"
-                autoFocus
-                className="mt-1.5 w-full rounded-xl border border-vitta-border px-3 py-2.5 outline-none focus:border-vitta focus:ring-2 focus:ring-vitta/15"
-                maxLength={200}
-                name="pixKey"
-                placeholder="CPF, e-mail, telefone ou chave aleatória"
-                required
-              />
-            </label>
-            <FormFeedback state={pixState} />
-            <button
-              className="w-full rounded-xl bg-vitta px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-vitta/90 disabled:opacity-60"
-              disabled={pixPending}
-              type="submit"
-            >
-              {pixPending ? "Salvando..." : "Salvar chave PIX"}
-            </button>
-          </form>
-        </section>
-      </div>
-    )}
-    </>
   );
 }

@@ -24,10 +24,6 @@ import {
   RequestRateLimitUnavailableError,
 } from "@/lib/request-rate-limit";
 import { createMercadoPagoPixDeposit } from "@/lib/mercadopago-deposit-payments";
-import {
-  getLiveModeDepositMaximumCents,
-  toDepositCents,
-} from "@/lib/mercadopago-live-deposit-limit";
 
 class BookingUnavailableError extends Error {}
 
@@ -142,7 +138,13 @@ export async function createPublicBookingAction(
       deletionPendingAt: null,
       deletionRequestedAt: null,
     },
-    select: { id: true, timezone: true, pixKey: true, expiresAt: true },
+    select: {
+      id: true,
+      timezone: true,
+      pixKey: true,
+      pixDepositMode: true,
+      expiresAt: true,
+    },
   });
 
   if (!professional) {
@@ -201,42 +203,25 @@ export async function createPublicBookingAction(
   }
 
   const mercadoPagoConnection =
-    depositAmount > 0
+    depositAmount > 0 && professional.pixDepositMode === "AUTOMATIC"
       ? await prisma.mercadoPagoConnection.findUnique({
           where: { professionalId: professional.id },
-          select: { liveMode: true },
+          select: { id: true },
         })
       : null;
-  const allowsLiveModeDeposits =
-    process.env.MERCADOPAGO_ALLOW_LIVE_MODE_DEPOSITS === "true";
-  const liveModeDepositMaximumCents =
-    getLiveModeDepositMaximumCents();
-  const usesAutomaticPix = Boolean(
-    mercadoPagoConnection &&
-      (!mercadoPagoConnection.liveMode || allowsLiveModeDeposits),
-  );
+  const usesAutomaticPix =
+    professional.pixDepositMode === "AUTOMATIC" &&
+    Boolean(mercadoPagoConnection);
 
-  if (mercadoPagoConnection?.liveMode && !allowsLiveModeDeposits) {
+  if (
+    depositAmount > 0 &&
+    professional.pixDepositMode === "AUTOMATIC" &&
+    !mercadoPagoConnection
+  ) {
     return {
       error:
-        "A conta Mercado Pago está em produção. A habilitação de cobranças reais está desativada.",
+        "O sinal automático está indisponível. Entre em contato com a profissional.",
     };
-  }
-
-  if (mercadoPagoConnection?.liveMode) {
-    if (liveModeDepositMaximumCents === null) {
-      return {
-        error: "O limite de segurança para cobranças reais não está configurado.",
-      };
-    }
-    if (toDepositCents(depositAmount) > liveModeDepositMaximumCents) {
-      const maximumAmount = (liveModeDepositMaximumCents / 100)
-        .toFixed(2)
-        .replace(".", ",");
-      return {
-        error: `O sinal excede o limite de segurança de R$ ${maximumAmount}.`,
-      };
-    }
   }
 
   if (
@@ -247,7 +232,11 @@ export async function createPublicBookingAction(
     return { error: "Informe um e-mail válido para gerar o Pix." };
   }
 
-  if (depositAmount > 0 && !usesAutomaticPix && !professional.pixKey) {
+  if (
+    depositAmount > 0 &&
+    professional.pixDepositMode === "MANUAL" &&
+    !professional.pixKey
+  ) {
     return {
       error:
         "O sinal deste serviço está temporariamente indisponível. Entre em contato com a profissional.",
