@@ -59,9 +59,12 @@ export async function createMercadoPagoPixDeposit(input: {
   const connection = await getMercadoPagoConnectedAccount(
     input.professionalId,
   );
-  if (connection.liveMode) {
+  if (
+    connection.liveMode &&
+    process.env.MERCADOPAGO_ALLOW_LIVE_MODE_DEPOSITS !== "true"
+  ) {
     throw new Error(
-      "Pix deposit creation is disabled for production Mercado Pago accounts.",
+      "Pix deposits for production Mercado Pago accounts are disabled.",
     );
   }
 

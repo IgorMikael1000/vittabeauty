@@ -12,6 +12,7 @@ type PublicBookingFormProps = {
   serviceId: string;
   requiresPayerEmail: boolean;
   automaticPix: boolean;
+  liveModePix: boolean;
   date: string;
   timeZone: string;
   slots: AvailableSlot[];
@@ -24,6 +25,7 @@ export function PublicBookingForm({
   serviceId,
   requiresPayerEmail,
   automaticPix,
+  liveModePix,
   date,
   timeZone,
   slots,
@@ -106,6 +108,16 @@ export function PublicBookingForm({
             type="email"
           />
         </label>
+      )}
+
+      {liveModePix && (
+        <p
+          className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950"
+          role="alert"
+        >
+          Atenção: a conta Mercado Pago conectada está em produção. Esta
+          cobrança Pix pode movimentar dinheiro real.
+        </p>
       )}
 
       <label className="block text-sm font-medium text-vitta-text">

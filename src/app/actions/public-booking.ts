@@ -153,7 +153,12 @@ export async function createPublicBookingAction(
           select: { liveMode: true },
         })
       : null;
-  const usesAutomaticPix = Boolean(mercadoPagoConnection);
+  const allowsLiveModeDeposits =
+    process.env.MERCADOPAGO_ALLOW_LIVE_MODE_DEPOSITS === "true";
+  const usesAutomaticPix = Boolean(
+    mercadoPagoConnection &&
+      (!mercadoPagoConnection.liveMode || allowsLiveModeDeposits),
+  );
 
   if (
     usesAutomaticPix &&
@@ -163,10 +168,10 @@ export async function createPublicBookingAction(
     return { error: "Informe um e-mail válido para gerar o Pix." };
   }
 
-  if (mercadoPagoConnection?.liveMode) {
+  if (mercadoPagoConnection?.liveMode && !allowsLiveModeDeposits) {
     return {
       error:
-        "A cobrança Pix conectada está habilitada somente para contas Mercado Pago de teste.",
+        "A conta Mercado Pago está em produção. A habilitação de cobranças reais está desativada.",
     };
   }
 

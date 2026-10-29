@@ -93,9 +93,13 @@ usa o refresh token rotativo; por isso, a autorização solicita
 `offline_access`. Nunca altere a chave de criptografia depois de conectar
 contas, pois os tokens já salvos não poderão ser descriptografados.
 
-Esta fase **cria cobranças somente quando a conexão OAuth é de teste**
-(`live_mode=false`). Configure `MERCADOPAGO_DEPOSIT_WEBHOOK_SECRET` com a chave
-de assinatura do webhook da aplicação e cadastre o endpoint
+Por padrão, esta fase **cria cobranças somente quando a conexão OAuth é de teste**
+(`live_mode=false`). Para permitir cobranças com conexões OAuth de produção,
+configure `MERCADOPAGO_ALLOW_LIVE_MODE_DEPOSITS=true` no servidor. Isso pode
+movimentar dinheiro real; a página pública exibirá um aviso antes de solicitar
+o agendamento. Mantenha essa opção desativada durante testes. Configure
+`MERCADOPAGO_DEPOSIT_WEBHOOK_SECRET` com a chave de assinatura do webhook da
+aplicação e cadastre o endpoint
 `https://seu-dominio/api/webhooks/mercadopago/deposits` para notificações de
 pagamentos. A URL `NEXT_PUBLIC_APP_URL` deve apontar para a origem pública da
 aplicação. O Pix expira em 30 minutos; só um pagamento aprovado e verificado
@@ -104,10 +108,8 @@ Para gerar o Pix, a cliente informa o e-mail do pagador.
 
 Depois de aplicar as migrations pendentes, publique o app, conecte uma conta
 Mercado Pago de teste pelo endpoint acima e faça uma solicitação de agendamento
-com sinal. A conta conectada precisa estar em modo de teste. A tela pública
-mostra o QR Code e o copia e cola; após pagar, atualize a página para ver a
-confirmação. Uma conta OAuth em produção é bloqueada para criação de Pix nesta
-fase.
+com sinal. A conexão em modo de teste é recomendada. A tela pública mostra o
+QR Code e o copia e cola; após pagar, atualize a página para ver a confirmação.
 
 ### Cloudinary para fotos de perfil
 

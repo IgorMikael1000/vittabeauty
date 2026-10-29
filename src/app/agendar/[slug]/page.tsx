@@ -504,12 +504,22 @@ export default async function PublicBookingPage({
                       requiresPayerEmail={
                         Number(selectedService.depositAmount ?? 0) > 0 &&
                         professional.mercadoPagoConnection !== null &&
-                        !professional.mercadoPagoConnection.liveMode
+                        (!professional.mercadoPagoConnection.liveMode ||
+                          process.env.MERCADOPAGO_ALLOW_LIVE_MODE_DEPOSITS ===
+                            "true")
                       }
                       automaticPix={
                         Number(selectedService.depositAmount ?? 0) > 0 &&
                         professional.mercadoPagoConnection !== null &&
-                        !professional.mercadoPagoConnection.liveMode
+                        (!professional.mercadoPagoConnection.liveMode ||
+                          process.env.MERCADOPAGO_ALLOW_LIVE_MODE_DEPOSITS ===
+                            "true")
+                      }
+                      liveModePix={
+                        Number(selectedService.depositAmount ?? 0) > 0 &&
+                        professional.mercadoPagoConnection?.liveMode === true &&
+                        process.env.MERCADOPAGO_ALLOW_LIVE_MODE_DEPOSITS ===
+                          "true"
                       }
                       slug={slug}
                       slots={slots}
