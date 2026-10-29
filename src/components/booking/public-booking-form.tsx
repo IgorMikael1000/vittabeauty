@@ -10,6 +10,8 @@ import type { AvailableSlot } from "@/lib/public-booking";
 type PublicBookingFormProps = {
   slug: string;
   serviceId: string;
+  requiresPayerEmail: boolean;
+  automaticPix: boolean;
   date: string;
   timeZone: string;
   slots: AvailableSlot[];
@@ -20,6 +22,8 @@ const initialState: FormState = {};
 export function PublicBookingForm({
   slug,
   serviceId,
+  requiresPayerEmail,
+  automaticPix,
   date,
   timeZone,
   slots,
@@ -90,6 +94,20 @@ export function PublicBookingForm({
         </label>
       </div>
 
+      {requiresPayerEmail && (
+        <label className="block text-sm font-medium text-vitta-text">
+          E-mail para gerar o Pix
+          <input
+            autoComplete="email"
+            className="mt-1.5 w-full rounded-xl border border-vitta-border px-3 py-3 outline-none focus:border-vitta focus:ring-2 focus:ring-vitta/15"
+            maxLength={254}
+            name="email"
+            required
+            type="email"
+          />
+        </label>
+      )}
+
       <label className="block text-sm font-medium text-vitta-text">
         Observações (opcional)
         <textarea
@@ -109,7 +127,9 @@ export function PublicBookingForm({
         {pending ? "Enviando solicitação..." : "Solicitar agendamento"}
       </button>
       <p className="text-center text-xs leading-5 text-vitta-muted">
-        O horário será solicitado à profissional e precisa ser confirmado.
+        {automaticPix
+          ? "O agendamento será confirmado automaticamente após a aprovação do Pix."
+          : "O horário será solicitado à profissional e precisa ser confirmado."}
       </p>
     </form>
   );

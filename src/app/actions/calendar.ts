@@ -88,7 +88,16 @@ async function ensureSlotIsAvailable(
     transaction.appointment.findFirst({
       where: {
         professionalId,
-        status: { in: activeAppointmentStatuses },
+        OR: [
+          { status: AppointmentStatus.CONFIRMED },
+          {
+            status: AppointmentStatus.PENDING,
+            OR: [
+              { depositPaymentExpiresAt: null },
+              { depositPaymentExpiresAt: { gt: new Date() } },
+            ],
+          },
+        ],
         startsAt: { gte: dayBounds.start, lt: endsAt },
         endsAt: { gt: startsAt },
       },
@@ -395,6 +404,7 @@ export async function updateAppointmentStatusAction(
       startsAt: true,
       status: true,
       priceAtBooking: true,
+      depositPayment: { select: { status: true, amount: true } },
       service: { select: { name: true, materialCost: true } },
       client: { select: { name: true } },
     },
@@ -409,6 +419,17 @@ export async function updateAppointmentStatusAction(
     appointment.status !== AppointmentStatus.PENDING
   ) {
     return { error: "Somente solicitações pendentes podem ser confirmadas." };
+  }
+
+  if (
+    intent === "confirm" &&
+    appointment.depositPayment &&
+    appointment.depositPayment.status !== "approved"
+  ) {
+    return {
+      error:
+        "O agendamento só pode ser confirmado depois que o sinal Pix for pago.",
+    };
   }
 
   if (!activeAppointmentStatuses.includes(appointment.status)) {
@@ -465,9 +486,24 @@ export async function updateAppointmentStatusAction(
       const description = `${appointment.service.name} · ${appointment.client.name}`;
       const completedAt = new Date();
       const paidAt = wasPaid ? completedAt : null;
-      const incomeStatus = wasPaid
-        ? TransactionStatus.PAID
-        : TransactionStatus.PENDING;
+      const depositPaid =
+        appointment.depositPayment?.status === "approved"
+          ? Number(appointment.depositPayment.amount)
+          : 0;
+      const remainingAmount = Math.max(
+        0,
+        Math.round((Number(appointment.priceAtBooking) - depositPaid) * 100) /
+          100,
+      );
+      const incomeStatus =
+        remainingAmount === 0
+          ? TransactionStatus.CANCELLED
+          : wasPaid
+            ? TransactionStatus.PAID
+            : TransactionStatus.PENDING;
+      const incomeDescription = depositPaid
+        ? `Saldo · ${description}`
+        : description;
       await transaction.transaction.upsert({
         where: {
           appointmentId_type: {
@@ -480,15 +516,17 @@ export async function updateAppointmentStatusAction(
           appointmentId: appointment.id,
           type: TransactionType.INCOME,
           status: incomeStatus,
-          amount: appointment.priceAtBooking,
-          description,
-          category: "Atendimento",
+          amount: remainingAmount,
+          description: incomeDescription,
+          category: depositPaid ? "Saldo de atendimento" : "Atendimento",
           dueAt: appointment.startsAt,
           paidAt,
         },
         update: {
           status: incomeStatus,
-          amount: appointment.priceAtBooking,
+          amount: remainingAmount,
+          description: incomeDescription,
+          category: depositPaid ? "Saldo de atendimento" : "Atendimento",
           paidAt,
         },
       });

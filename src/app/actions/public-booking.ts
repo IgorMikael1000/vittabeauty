@@ -23,13 +23,9 @@ import {
   checkRequestRateLimit,
   RequestRateLimitUnavailableError,
 } from "@/lib/request-rate-limit";
+import { createMercadoPagoPixDeposit } from "@/lib/mercadopago-deposit-payments";
 
 class BookingUnavailableError extends Error {}
-
-const activeAppointmentStatuses: AppointmentStatus[] = [
-  AppointmentStatus.PENDING,
-  AppointmentStatus.CONFIRMED,
-];
 
 export async function createPublicBookingAction(
   _previousState: FormState,
@@ -58,6 +54,7 @@ export async function createPublicBookingAction(
   const startsAtInput = formData.get("startsAt");
   const nameInput = formData.get("name");
   const whatsappInput = formData.get("whatsapp");
+  const emailInput = formData.get("email");
 
   if (
     typeof slug !== "string" ||
@@ -65,13 +62,16 @@ export async function createPublicBookingAction(
     typeof date !== "string" ||
     typeof startsAtInput !== "string" ||
     typeof nameInput !== "string" ||
-    typeof whatsappInput !== "string"
+    typeof whatsappInput !== "string" ||
+    (emailInput !== null && typeof emailInput !== "string")
   ) {
     return { error: "Preencha os campos obrigatórios do agendamento." };
   }
 
   const name = nameInput.trim();
   const whatsapp = normalizeClientWhatsapp(whatsappInput);
+  const payerEmail =
+    typeof emailInput === "string" ? emailInput.trim().toLowerCase() : "";
 
   if (name.length < 2 || name.length > 100) {
     return { error: "O nome deve ter entre 2 e 100 caracteres." };
@@ -139,7 +139,38 @@ export async function createPublicBookingAction(
     return { error: "Este serviço não está disponível para agendamento online." };
   }
 
-  if (Number(service.depositAmount ?? 0) > 0 && !professional.pixKey) {
+  const depositAmount = Number(service.depositAmount ?? 0);
+  if (depositAmount > Number(service.price)) {
+    return {
+      error: "O valor do sinal não pode ser maior que o valor do serviço.",
+    };
+  }
+
+  const mercadoPagoConnection =
+    depositAmount > 0
+      ? await prisma.mercadoPagoConnection.findUnique({
+          where: { professionalId: professional.id },
+          select: { liveMode: true },
+        })
+      : null;
+  const usesAutomaticPix = Boolean(mercadoPagoConnection);
+
+  if (
+    usesAutomaticPix &&
+    (payerEmail.length > 254 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payerEmail))
+  ) {
+    return { error: "Informe um e-mail válido para gerar o Pix." };
+  }
+
+  if (mercadoPagoConnection?.liveMode) {
+    return {
+      error:
+        "A cobrança Pix conectada está habilitada somente para contas Mercado Pago de teste.",
+    };
+  }
+
+  if (depositAmount > 0 && !usesAutomaticPix && !professional.pixKey) {
     return {
       error:
         "O sinal deste serviço está temporariamente indisponível. Entre em contato com a profissional.",
@@ -206,6 +237,9 @@ export async function createPublicBookingAction(
   const notes =
     typeof rawNotes === "string" ? rawNotes.trim().slice(0, 500) || null : null;
 
+  const depositPaymentExpiresAt = usesAutomaticPix
+    ? new Date(Date.now() + 30 * 60_000)
+    : null;
   let appointmentId: string;
   try {
     appointmentId = await prisma.$transaction(
@@ -214,9 +248,18 @@ export async function createPublicBookingAction(
           transaction.appointment.findFirst({
             where: {
               professionalId: professional.id,
-              status: { in: activeAppointmentStatuses },
               startsAt: { gte: bounds.start, lt: endsAt },
               endsAt: { gt: startsAt },
+              OR: [
+                { status: AppointmentStatus.CONFIRMED },
+                {
+                  status: AppointmentStatus.PENDING,
+                  OR: [
+                    { depositPaymentExpiresAt: null },
+                    { depositPaymentExpiresAt: { gt: new Date() } },
+                  ],
+                },
+              ],
             },
             select: { id: true },
           }),
@@ -280,7 +323,8 @@ export async function createPublicBookingAction(
             startsAt,
             endsAt,
             priceAtBooking: service.price,
-            depositAmount: service.depositAmount ?? 0,
+            depositAmount,
+            depositPaymentExpiresAt,
             status: AppointmentStatus.PENDING,
             notes,
           },
@@ -299,6 +343,16 @@ export async function createPublicBookingAction(
             dueAt: startsAt,
           },
         });
+        if (depositPaymentExpiresAt) {
+          await transaction.appointmentDepositPayment.create({
+            data: {
+              professionalId: professional.id,
+              appointmentId: appointment.id,
+              amount: depositAmount,
+              expiresAt: depositPaymentExpiresAt,
+            },
+          });
+        }
         return appointment.id;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
@@ -319,6 +373,64 @@ export async function createPublicBookingAction(
     }
 
     throw error;
+  }
+
+  if (depositPaymentExpiresAt) {
+    try {
+      const pixPayment = await createMercadoPagoPixDeposit({
+        professionalId: professional.id,
+        appointmentId,
+        amount: depositAmount,
+        payerEmail,
+        payerName: name,
+        expiresAt: depositPaymentExpiresAt,
+      });
+      const paymentSaved =
+        await prisma.appointmentDepositPayment.updateMany({
+          where: {
+            appointmentId,
+            OR: [
+              { providerPaymentId: null },
+              { providerPaymentId: pixPayment.paymentId },
+            ],
+            status: { not: "approved" },
+          },
+          data: {
+            providerPaymentId: pixPayment.paymentId,
+            status: pixPayment.status,
+            qrCode: pixPayment.qrCode,
+            qrCodeBase64: pixPayment.qrCodeBase64,
+          },
+        });
+      if (paymentSaved.count === 0) {
+        const currentPayment =
+          await prisma.appointmentDepositPayment.findUnique({
+            where: { appointmentId },
+            select: { providerPaymentId: true, status: true },
+          });
+        if (
+          currentPayment?.providerPaymentId !== pixPayment.paymentId ||
+          currentPayment.status !== "approved"
+        ) {
+          throw new Error(
+            "The Pix payment record changed while the provider request was completing.",
+          );
+        }
+      }
+    } catch (error) {
+      console.error("[mercadopago-deposit] Pix payment creation failed.", {
+        appointmentId,
+        code: error instanceof Error ? error.name : "UNKNOWN_ERROR",
+      });
+      await prisma.appointmentDepositPayment.updateMany({
+        where: { appointmentId, status: { not: "approved" } },
+        data: { status: "creation_failed" },
+      });
+      return {
+        error:
+          "Não foi possível confirmar a geração do Pix. Por segurança, o horário ficará reservado por até 30 minutos; se o QR Code não aparecer, fale com a profissional.",
+      };
+    }
   }
 
   revalidatePath("/dashboard/calendar");

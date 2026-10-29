@@ -37,33 +37,35 @@ enum AccountDeletionJobStatus {
 }
 
 model Professional {
-  id                   String                @id @default(cuid())
-  name                 String
-  email                String                @unique
-  firebaseUid          String?               @unique
-  cpf                  String?               @unique
-  phone                String?               @unique
-  specialty            String?
-  pixKey               String?
-  logoUrl              String?               @db.Text
-  subscriptionStatus   String                @default("TRIAL")
-  planType             String                @default("FREE")
-  expiresAt            DateTime              @default(dbgenerated("(CURRENT_TIMESTAMP + INTERVAL '3 days')"))
-  hasSeenWelcome       Boolean               @default(false)
-  role                 ProfessionalRole      @default(PROFESSIONAL)
-  slug                 String                @unique
-  timezone             String                @default("America/Sao_Paulo")
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-  deletionRequestedAt  DateTime?
-  deletionPendingAt    DateTime?
-  clients              Client[]
-  services             Service[]
-  appointments         Appointment[]
-  transactions         Transaction[]
-  workingHours         WorkingHours[]
-  calendarBlocks       CalendarBlock[]
-  subscriptionPayments SubscriptionPayment[]
+  id                         String                      @id @default(cuid())
+  name                       String
+  email                      String                      @unique
+  firebaseUid                String?                     @unique
+  cpf                        String?                     @unique
+  phone                      String?                     @unique
+  specialty                  String?
+  pixKey                     String?
+  logoUrl                    String?                     @db.Text
+  subscriptionStatus         String                      @default("TRIAL")
+  planType                   String                      @default("FREE")
+  expiresAt                  DateTime                    @default(dbgenerated("(CURRENT_TIMESTAMP + INTERVAL '3 days')"))
+  hasSeenWelcome             Boolean                     @default(false)
+  role                       ProfessionalRole            @default(PROFESSIONAL)
+  slug                       String                      @unique
+  timezone                   String                      @default("America/Sao_Paulo")
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+  deletionRequestedAt        DateTime?
+  deletionPendingAt          DateTime?
+  mercadoPagoConnection      MercadoPagoConnection?
+  appointmentDepositPayments AppointmentDepositPayment[]
+  clients                    Client[]
+  services                   Service[]
+  appointments               Appointment[]
+  transactions               Transaction[]
+  workingHours               WorkingHours[]
+  calendarBlocks             CalendarBlock[]
+  subscriptionPayments       SubscriptionPayment[]
 
   @@index([createdAt])
 }
@@ -108,23 +110,25 @@ model Service {
 }
 
 model Appointment {
-  id             String            @id @default(cuid())
-  professionalId String
-  clientId       String
-  serviceId      String
-  startsAt       DateTime
-  endsAt         DateTime
-  status         AppointmentStatus @default(PENDING)
-  priceAtBooking Decimal           @db.Decimal(10, 2)
-  materialCost   Decimal           @default(0) @db.Decimal(10, 2)
-  depositAmount  Decimal           @default(0) @db.Decimal(10, 2)
-  notes          String?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  professional   Professional      @relation(fields: [professionalId], references: [id], onDelete: Cascade)
-  client         Client            @relation("ClientAppointments", fields: [clientId, professionalId], references: [id, professionalId], onDelete: Restrict)
-  service        Service           @relation(fields: [serviceId, professionalId], references: [id, professionalId], onDelete: Restrict)
-  transactions   Transaction[]
+  id                      String                     @id @default(cuid())
+  professionalId          String
+  clientId                String
+  serviceId               String
+  startsAt                DateTime
+  endsAt                  DateTime
+  status                  AppointmentStatus          @default(PENDING)
+  priceAtBooking          Decimal                    @db.Decimal(10, 2)
+  materialCost            Decimal                    @default(0) @db.Decimal(10, 2)
+  depositAmount           Decimal                    @default(0) @db.Decimal(10, 2)
+  depositPaymentExpiresAt DateTime?
+  notes                   String?
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
+  professional            Professional               @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  client                  Client                     @relation("ClientAppointments", fields: [clientId, professionalId], references: [id, professionalId], onDelete: Restrict)
+  service                 Service                    @relation(fields: [serviceId, professionalId], references: [id, professionalId], onDelete: Restrict)
+  transactions            Transaction[]
+  depositPayment          AppointmentDepositPayment?
 
   @@unique([id, professionalId])
   @@index([professionalId, startsAt])
@@ -158,20 +162,22 @@ model CalendarBlock {
 }
 
 model Transaction {
-  id             String            @id @default(cuid())
-  professionalId String
-  appointmentId  String?
-  type           TransactionType
-  status         TransactionStatus @default(PENDING)
-  amount         Decimal           @db.Decimal(10, 2)
-  description    String
-  category       String?
-  dueAt          DateTime?
-  paidAt         DateTime?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  professional   Professional      @relation(fields: [professionalId], references: [id], onDelete: Cascade)
-  appointment    Appointment?      @relation(fields: [appointmentId, professionalId], references: [id, professionalId], onDelete: Restrict)
+  id               String                     @id @default(cuid())
+  professionalId   String
+  appointmentId    String?
+  depositPaymentId String?                    @unique
+  type             TransactionType
+  status           TransactionStatus          @default(PENDING)
+  amount           Decimal                    @db.Decimal(10, 2)
+  description      String
+  category         String?
+  dueAt            DateTime?
+  paidAt           DateTime?
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+  professional     Professional               @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  appointment      Appointment?               @relation(fields: [appointmentId, professionalId], references: [id, professionalId], onDelete: Restrict)
+  depositPayment   AppointmentDepositPayment? @relation(fields: [depositPaymentId], references: [id], onDelete: SetNull)
 
   @@unique([appointmentId, type])
   @@index([professionalId, type, status])
@@ -198,6 +204,45 @@ model SubscriptionPayment {
 
   @@index([professionalId, status, paidAt])
   @@index([status, paidAt])
+}
+
+model MercadoPagoConnection {
+  id                    String       @id @default(cuid())
+  professionalId        String       @unique
+  accountId             String       @unique
+  accessTokenEncrypted  String       @db.Text
+  refreshTokenEncrypted String       @db.Text
+  tokenExpiresAt        DateTime
+  liveMode              Boolean
+  scopes                String?
+  connectedAt           DateTime     @default(now())
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  professional          Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@index([tokenExpiresAt])
+}
+
+model AppointmentDepositPayment {
+  id                 String       @id @default(cuid())
+  professionalId     String
+  appointmentId      String       @unique
+  providerPaymentId  String?      @unique
+  status             String       @default("creating")
+  amount             Decimal      @db.Decimal(10, 2)
+  currency           String       @default("BRL")
+  qrCode             String?      @db.Text
+  qrCodeBase64       String?      @db.Text
+  expiresAt          DateTime
+  paidAt             DateTime?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  professional       Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  appointment        Appointment  @relation(fields: [appointmentId, professionalId], references: [id, professionalId], onDelete: Cascade)
+  depositTransaction Transaction?
+
+  @@unique([appointmentId, professionalId])
+  @@index([professionalId, status, expiresAt])
 }
 
 model AdminAuditLog {

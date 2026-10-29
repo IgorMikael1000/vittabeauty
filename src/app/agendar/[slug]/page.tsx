@@ -99,6 +99,7 @@ export default async function PublicBookingPage({
       expiresAt: true,
       pixKey: true,
       phone: true,
+      mercadoPagoConnection: { select: { liveMode: true } },
       services: {
         where: { isActive: true, onlineBookingEnabled: true },
         orderBy: { name: "asc" },
@@ -152,6 +153,15 @@ export default async function PublicBookingPage({
           select: {
             startsAt: true,
             depositAmount: true,
+            status: true,
+            depositPayment: {
+              select: {
+                status: true,
+                qrCode: true,
+                qrCodeBase64: true,
+                expiresAt: true,
+              },
+            },
             service: { select: { name: true } },
           },
         })
@@ -165,6 +175,7 @@ export default async function PublicBookingPage({
     : null;
   const professionalWhatsApp = getWhatsAppNumber(professional.phone ?? "");
   const depositValue = Number(successfulBooking?.depositAmount ?? 0);
+  const depositPayment = successfulBooking?.depositPayment ?? null;
   const whatsappMessage = successfulBooking && bookingDateTime
     ? `Olá! Acabei de solicitar o serviço ${successfulBooking.service.name} para ${bookingDateTime} no Vitta Beauty. Segue o comprovante do sinal de ${currency.format(depositValue)}.`
     : "";
@@ -241,9 +252,16 @@ export default async function PublicBookingPage({
         prisma.appointment.findMany({
           where: {
             professionalId: professional.id,
-            status: {
-              in: [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED],
-            },
+            OR: [
+              { status: AppointmentStatus.CONFIRMED },
+              {
+                status: AppointmentStatus.PENDING,
+                OR: [
+                  { depositPaymentExpiresAt: null },
+                  { depositPaymentExpiresAt: { gt: new Date() } },
+                ],
+              },
+            ],
             startsAt: { lt: bounds.end },
             endsAt: { gt: bounds.start },
           },
@@ -309,7 +327,79 @@ export default async function PublicBookingPage({
               <p>
                 Sua solicitação foi enviada.
               </p>
-              {successfulBooking && depositValue > 0 && (
+              {successfulBooking && depositValue > 0 && depositPayment && (
+                <div className="space-y-3 border-t border-emerald-200 pt-4">
+                  {depositPayment.status === "approved" &&
+                  successfulBooking.status === AppointmentStatus.CONFIRMED ? (
+                    <p className="font-semibold">
+                      Pix confirmado! Seu agendamento está confirmado.
+                    </p>
+                  ) : depositPayment.status === "approved" ? (
+                    <p className="font-semibold">
+                      O Pix foi recebido, mas não foi possível confirmar
+                      automaticamente este horário. Entre em contato com a
+                      profissional.
+                    </p>
+                  ) : depositPayment.status === "pending" &&
+                    depositPayment.expiresAt > new Date() &&
+                    depositPayment.qrCode ? (
+                    <>
+                      <div>
+                        <h2 className="font-semibold">
+                          Pague o sinal para confirmar seu agendamento
+                        </h2>
+                        <p className="mt-1">
+                          Valor: <strong>{currency.format(depositValue)}</strong>
+                        </p>
+                      </div>
+                      {depositPayment.qrCodeBase64 && (
+                        <Image
+                          alt="QR Code Pix do sinal"
+                          className="mx-auto rounded-lg border border-emerald-200 bg-white p-2"
+                          height={240}
+                          src={`data:image/png;base64,${depositPayment.qrCodeBase64}`}
+                          unoptimized
+                          width={240}
+                        />
+                      )}
+                      <label className="block font-medium">
+                        Pix copia e cola
+                        <textarea
+                          className="mt-1 w-full select-all rounded-lg border border-emerald-200 bg-white/80 p-3 font-mono text-xs"
+                          readOnly
+                          rows={4}
+                          value={depositPayment.qrCode}
+                        />
+                      </label>
+                      <p>
+                        Após o pagamento, esta solicitação será confirmada
+                        automaticamente. Atualize esta página para consultar o
+                        status.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="font-medium">
+                      {depositPayment.status === "pending"
+                        ? "O Pix está sendo preparado. Atualize esta página em instantes."
+                        : "Este Pix não está mais disponível. Faça uma nova solicitação de agendamento."}
+                    </p>
+                  )}
+                  {depositPayment.status === "pending" &&
+                    depositPayment.expiresAt > new Date() && (
+                    <p className="text-xs">
+                      O código expira às{" "}
+                      {new Intl.DateTimeFormat("pt-BR", {
+                        timeZone: professional.timezone,
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      }).format(depositPayment.expiresAt)}.
+                    </p>
+                  )}
+                </div>
+              )}
+              {successfulBooking &&
+                depositValue > 0 &&
+                !depositPayment && (
                 <div className="space-y-3 border-t border-emerald-200 pt-4">
                   <div>
                     <h2 className="font-semibold">
@@ -411,6 +501,16 @@ export default async function PublicBookingPage({
                     <PublicBookingForm
                       date={date}
                       serviceId={selectedService.id}
+                      requiresPayerEmail={
+                        Number(selectedService.depositAmount ?? 0) > 0 &&
+                        professional.mercadoPagoConnection !== null &&
+                        !professional.mercadoPagoConnection.liveMode
+                      }
+                      automaticPix={
+                        Number(selectedService.depositAmount ?? 0) > 0 &&
+                        professional.mercadoPagoConnection !== null &&
+                        !professional.mercadoPagoConnection.liveMode
+                      }
                       slug={slug}
                       slots={slots}
                       timeZone={professional.timezone}

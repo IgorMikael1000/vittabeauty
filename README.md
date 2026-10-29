@@ -75,17 +75,39 @@ diferenças.
 Para produção, aplique as migrations pendentes com `npm run db:migrate:deploy`
 antes de disponibilizar a versão correspondente.
 
-### Teste de conexão OAuth do Mercado Pago
+### Teste de Pix de sinal via Mercado Pago OAuth
 
-O fluxo experimental de autorização fica disponível somente por acesso direto
-ao endpoint autenticado
-`/api/integrations/mercadopago/connect`; ainda não há botão ou tela no painel.
-Configure `MERCADOPAGO_CLIENT_ID`, `MERCADOPAGO_CLIENT_SECRET` e
-`MERCADOPAGO_OAUTH_REDIRECT_URI` no ambiente do servidor. Cadastre no Mercado
-Pago a URL estática exata apontada pela última variável, por exemplo
-`https://seu-dominio/api/integrations/mercadopago/callback`, e habilite PKCE
-na aplicação. O callback valida o retorno e consulta a conta autorizada, mas
-nesta etapa descarta o token e não salva credenciais nem inicia cobranças.
+A conexão OAuth é iniciada somente pelo endpoint autenticado
+`/api/integrations/mercadopago/connect`; ainda não há botão no painel.
+Configure `MERCADOPAGO_CLIENT_ID`, `MERCADOPAGO_CLIENT_SECRET`,
+`MERCADOPAGO_OAUTH_REDIRECT_URI` e `MERCADOPAGO_TOKEN_ENCRYPTION_KEY` no
+servidor. A URL de callback deve ser estática, cadastrada na aplicação Mercado
+Pago, e o fluxo PKCE deve estar habilitado. Gere a chave de criptografia com:
+
+```powershell
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
+O callback salva os tokens OAuth criptografados com AES-256-GCM e a renovação
+usa o refresh token rotativo; por isso, a autorização solicita
+`offline_access`. Nunca altere a chave de criptografia depois de conectar
+contas, pois os tokens já salvos não poderão ser descriptografados.
+
+Esta fase **cria cobranças somente quando a conexão OAuth é de teste**
+(`live_mode=false`). Configure `MERCADOPAGO_DEPOSIT_WEBHOOK_SECRET` com a chave
+de assinatura do webhook da aplicação e cadastre o endpoint
+`https://seu-dominio/api/webhooks/mercadopago/deposits` para notificações de
+pagamentos. A URL `NEXT_PUBLIC_APP_URL` deve apontar para a origem pública da
+aplicação. O Pix expira em 30 minutos; só um pagamento aprovado e verificado
+diretamente na API do Mercado Pago confirma automaticamente o agendamento.
+Para gerar o Pix, a cliente informa o e-mail do pagador.
+
+Depois de aplicar as migrations pendentes, publique o app, conecte uma conta
+Mercado Pago de teste pelo endpoint acima e faça uma solicitação de agendamento
+com sinal. A conta conectada precisa estar em modo de teste. A tela pública
+mostra o QR Code e o copia e cola; após pagar, atualize a página para ver a
+confirmação. Uma conta OAuth em produção é bloqueada para criação de Pix nesta
+fase.
 
 ### Cloudinary para fotos de perfil
 

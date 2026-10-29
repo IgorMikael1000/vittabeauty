@@ -46,6 +46,7 @@ export async function GET(): Promise<Response> {
     client_id: result.configuration.clientId,
     response_type: "code",
     platform_id: "mp",
+    scope: "offline_access",
     state,
     redirect_uri: result.configuration.redirectUri,
     code_challenge: challenge,

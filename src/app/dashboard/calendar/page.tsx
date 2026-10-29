@@ -72,6 +72,16 @@ export default async function CalendarPage({
         where: {
           professionalId,
           startsAt: { gte: range.start, lt: range.end },
+          OR: [
+            { status: { not: "PENDING" } },
+            {
+              status: "PENDING",
+              OR: [
+                { depositPaymentExpiresAt: null },
+                { depositPaymentExpiresAt: { gt: new Date() } },
+              ],
+            },
+          ],
         },
         orderBy: { startsAt: "asc" },
         include: {

@@ -6,8 +6,11 @@ import {
   getMercadoPagoOAuthStateSecret,
   MERCADOPAGO_OAUTH_STATE_COOKIE,
   MERCADOPAGO_OAUTH_VERIFIER_COOKIE,
+  MERCADOPAGO_OAUTH_CALLBACK_PATH,
   secureStringEqual,
 } from "@/lib/mercadopago-oauth";
+import { getPrismaClient } from "@/lib/prisma";
+import { encryptMercadoPagoToken } from "@/lib/mercadopago-token-crypto";
 
 export const runtime = "nodejs";
 
@@ -27,8 +30,15 @@ export async function GET(request: Request): Promise<Response> {
   const cookieStore = await cookies();
   const stateToken = cookieStore.get(MERCADOPAGO_OAUTH_STATE_COOKIE)?.value;
   const verifier = cookieStore.get(MERCADOPAGO_OAUTH_VERIFIER_COOKIE)?.value;
-  cookieStore.delete(MERCADOPAGO_OAUTH_STATE_COOKIE);
-  cookieStore.delete(MERCADOPAGO_OAUTH_VERIFIER_COOKIE);
+  const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
+    path: MERCADOPAGO_OAUTH_CALLBACK_PATH,
+    maxAge: 0,
+  };
+  cookieStore.set(MERCADOPAGO_OAUTH_STATE_COOKIE, "", cookieOptions);
+  cookieStore.set(MERCADOPAGO_OAUTH_VERIFIER_COOKIE, "", cookieOptions);
 
   const url = new URL(request.url);
   const returnedState = url.searchParams.get("state");
@@ -148,12 +158,34 @@ export async function GET(request: Request): Promise<Response> {
     tokenData === null ||
     !("access_token" in tokenData) ||
     typeof tokenData.access_token !== "string" ||
-    !tokenData.access_token
+    !tokenData.access_token ||
+    !("refresh_token" in tokenData) ||
+    typeof tokenData.refresh_token !== "string" ||
+    !tokenData.refresh_token ||
+    !("user_id" in tokenData) ||
+    (typeof tokenData.user_id !== "number" &&
+      typeof tokenData.user_id !== "string") ||
+    !("expires_in" in tokenData) ||
+    typeof tokenData.expires_in !== "number" ||
+    !Number.isFinite(tokenData.expires_in) ||
+    tokenData.expires_in <= 0 ||
+    !("live_mode" in tokenData) ||
+    typeof tokenData.live_mode !== "boolean" ||
+    !("scope" in tokenData) ||
+    typeof tokenData.scope !== "string" ||
+    !tokenData.scope.split(/\s+/).includes("offline_access")
   ) {
-    console.error("[mercadopago-oauth] Token response did not contain an access token.");
-    return textResponse("O Mercado Pago não retornou um token válido.", 502);
+    console.error(
+      "[mercadopago-oauth] Token response is missing required offline-access fields.",
+    );
+    return textResponse(
+      "O Mercado Pago não autorizou a renovação automática. Inicie novamente a conexão e aceite o acesso offline.",
+      502,
+    );
   }
   const accessToken = tokenData.access_token;
+  const refreshToken = tokenData.refresh_token;
+  const accountId = String(tokenData.user_id);
 
   let accountResponse: Response;
   try {
@@ -204,8 +236,68 @@ export async function GET(request: Request): Promise<Response> {
     return textResponse("Não foi possível identificar a conta autorizada.", 502);
   }
 
+  if (String(accountData.id) !== accountId) {
+    console.error("[mercadopago-oauth] OAuth account identity did not match.");
+    return textResponse(
+      "A conta Mercado Pago retornada não corresponde à autorização.",
+      502,
+    );
+  }
+
+  let encryptedAccessToken: string;
+  let encryptedRefreshToken: string;
+  try {
+    encryptedAccessToken = encryptMercadoPagoToken(accessToken);
+    encryptedRefreshToken = encryptMercadoPagoToken(refreshToken);
+  } catch (error) {
+    console.error("[mercadopago-oauth] Token encryption is not configured.", {
+      code: error instanceof Error ? error.name : "UNKNOWN_ERROR",
+    });
+    return textResponse(
+      "A conexão não pôde ser armazenada com segurança. A configuração do servidor está incompleta.",
+      503,
+    );
+  }
+
+  try {
+    await getPrismaClient().mercadoPagoConnection.upsert({
+      where: { professionalId: statePayload.professionalId },
+      create: {
+        professionalId: statePayload.professionalId,
+        accountId,
+        accessTokenEncrypted: encryptedAccessToken,
+        refreshTokenEncrypted: encryptedRefreshToken,
+        tokenExpiresAt: new Date(
+          Date.now() + tokenData.expires_in * 1000,
+        ),
+        liveMode: tokenData.live_mode,
+        scopes: tokenData.scope,
+        connectedAt: new Date(),
+      },
+      update: {
+        accountId,
+        accessTokenEncrypted: encryptedAccessToken,
+        refreshTokenEncrypted: encryptedRefreshToken,
+        tokenExpiresAt: new Date(
+          Date.now() + tokenData.expires_in * 1000,
+        ),
+        liveMode: tokenData.live_mode,
+        scopes: tokenData.scope,
+        connectedAt: new Date(),
+      },
+    });
+  } catch (error) {
+    console.error("[mercadopago-oauth] Failed to save the account connection.", {
+      code: error instanceof Error ? error.name : "UNKNOWN_ERROR",
+    });
+    return textResponse(
+      "A conta foi autorizada, mas não foi possível salvar a conexão. Tente novamente.",
+      500,
+    );
+  }
+
   return textResponse(
-    `Teste OAuth concluído com sucesso. ID da conta Mercado Pago: ${String(accountData.id)}. O token não foi armazenado; esta etapa apenas validou a conexão.`,
+    `Conta Mercado Pago conectada e tokens protegidos com sucesso. ID da conta: ${accountId}. Ambiente: ${tokenData.live_mode ? "produção" : "teste"}.`,
     200,
   );
 }
