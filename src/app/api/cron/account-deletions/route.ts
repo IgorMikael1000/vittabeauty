@@ -1,8 +1,4 @@
 import { timingSafeEqual } from "node:crypto";
-import {
-  getAccountDeletionErrorDetails,
-  logAccountDeletionEvent,
-} from "@/lib/account-deletion-logger";
 import { processPendingAccountDeletions } from "@/lib/account-deletion-worker";
 
 export const runtime = "nodejs";
@@ -23,45 +19,22 @@ function isAuthorized(request: Request): boolean {
 
 export async function GET(request: Request): Promise<Response> {
   if (!process.env.CRON_SECRET) {
-    logAccountDeletionEvent("cron.configuration_failed", {
-      outcome: "failed",
-      stage: "cron_authentication",
-      code: "CRON_SECRET_NOT_CONFIGURED",
-    });
+    console.error("[account-deletion] CRON_SECRET is not configured.");
     return Response.json(
       { error: "Cron authentication is not configured." },
       { status: 503 },
     );
   }
   if (!isAuthorized(request)) {
-    logAccountDeletionEvent("cron.request_rejected", {
-      outcome: "rejected",
-      stage: "cron_authentication",
-      code: "UNAUTHORIZED",
-    });
     return Response.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  const startedAt = Date.now();
-  logAccountDeletionEvent("cron.started", {
-    outcome: "started",
-    stage: "worker_start",
-  });
   try {
     const result = await processPendingAccountDeletions();
-    logAccountDeletionEvent("cron.completed", {
-      outcome: "success",
-      stage: "worker_complete",
-      ...result,
-      durationMs: Date.now() - startedAt,
-    });
     return Response.json(result);
   } catch (error) {
-    logAccountDeletionEvent("cron.failed", {
-      outcome: "failed",
-      stage: "worker_execution",
-      durationMs: Date.now() - startedAt,
-      ...getAccountDeletionErrorDetails(error),
+    console.error("[account-deletion] Worker run failed.", {
+      code: error instanceof Error ? error.name : "UNKNOWN_ERROR",
     });
     return Response.json(
       { error: "Account deletion worker failed." },

@@ -201,8 +201,7 @@ remover o suporte legado.
   o acesso autenticado e desativa o agendamento público. A remoção do usuário do
   Firebase, da foto do Cloudinary e dos dados relacionais é tentada imediatamente.
   Se uma etapa falhar, a tarefa fica pendente e o Cron da Vercel (diariamente às
-  03:00 UTC) tenta novamente com backoff. Falhas são registradas nos logs da
-  função.
+  03:00 UTC) tenta novamente com backoff.
 - O trial profissional dura três dias a partir do cadastro. Após o vencimento,
   o dashboard exige a escolha de um plano; o link público de agendamento fica
   indisponível até que um pagamento de plano seja confirmado.
