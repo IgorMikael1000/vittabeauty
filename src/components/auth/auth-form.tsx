@@ -19,6 +19,8 @@ import { auth, googleProvider } from "@/lib/firebase";
 
 type AuthFormProps = {
   accountDeletionPending?: boolean;
+  emailChanged?: boolean;
+  firebaseSignOutFailed?: boolean;
   registered?: boolean;
   initialEmail?: string;
 };
@@ -56,6 +58,8 @@ function firebaseErrorMessage(error: unknown): string {
 
 export function AuthForm({
   accountDeletionPending = false,
+  emailChanged = false,
+  firebaseSignOutFailed = false,
   registered = false,
   initialEmail = "",
 }: AuthFormProps) {
@@ -216,6 +220,25 @@ export function AuthForm({
           Cadastro realizado! O suporte do Vitta Beauty enviou um e-mail de
           confirmação para você. Por favor, confirme seu e-mail antes de
           realizar o login.
+        </p>
+      )}
+      {emailChanged && (
+        <p
+          className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-800"
+          role="status"
+        >
+          Seu e-mail foi alterado. Para continuar, faça login usando o novo
+          e-mail e sua senha.
+        </p>
+      )}
+      {firebaseSignOutFailed && (
+        <p
+          className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900"
+          role="alert"
+        >
+          A sessão do Vitta foi encerrada, mas não foi possível sair do Firebase
+          neste navegador. Atualize a página e entre com seu novo e-mail e
+          senha.
         </p>
       )}
       {accountDeletionPending && (

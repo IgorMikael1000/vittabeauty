@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { onAuthStateChanged, reload } from "firebase/auth";
+import { onAuthStateChanged, reload, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { syncProfessionalEmailFromFirebaseAction } from "@/app/actions/account";
 import { auth } from "@/lib/firebase";
@@ -42,9 +42,17 @@ export function FirebaseEmailChangeSync() {
           }
           return;
         }
+        try {
+          await signOut(auth);
+        } catch (error) {
+          console.error("Could not sign out after Firebase email change.", error);
+          if (active) {
+            router.replace("/login?emailChanged=1&signOutFailed=1");
+          }
+          return;
+        }
         if (active) {
-          router.replace("/dashboard/conta/dados");
-          router.refresh();
+          router.replace("/login?emailChanged=1");
         }
       } catch {
         if (active) {

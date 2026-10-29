@@ -173,9 +173,6 @@ export default async function FinancePage({
       description: isRealized
         ? "Receitas efetivamente pagas no período"
         : "Receitas pendentes de pagamento no período, incluindo atendimentos concluídos ainda não pagos",
-      comparison: isRealized
-        ? `Previsto: ${formatCents(forecastGrossIncomeCents)}`
-        : `Já pago: ${formatCents(realizedGrossIncomeCents)}`,
     },
     {
       label: "Custos de Serviços",
@@ -183,9 +180,6 @@ export default async function FinancePage({
       description: isRealized
         ? "Custos de material registrados em atendimentos concluídos"
         : "Materiais estimados para agendamentos pendentes ou confirmados",
-      comparison: isRealized
-        ? `Previsto: ${formatCents(forecastServiceCostCents)}`
-        : `Realizado: ${formatCents(realizedServiceCostCents)}`,
     },
     {
       label: "Despesas Fixas",
@@ -299,11 +293,6 @@ export default async function FinancePage({
             <p className="mt-2 text-xs leading-5 text-vitta-muted">
               {card.description}
             </p>
-            {"comparison" in card && (
-              <span className="mt-3 inline-flex rounded-full bg-vitta-background px-2.5 py-1 text-xs font-medium text-vitta-text">
-                {card.comparison}
-              </span>
-            )}
           </article>
         ))}
       </div>

@@ -42,8 +42,13 @@ export function getReportPeriod(
   const today = getDateInTimezone(now, timeZone);
   const [year, month] = today.split("-");
   const defaultFrom = `${year}-${month}-01`;
+  const defaultTo = new Date(
+    Date.UTC(Number(year), Number(month), 0),
+  )
+    .toISOString()
+    .slice(0, 10);
   const fromDate = fromInput ?? defaultFrom;
-  const toDate = toInput ?? today;
+  const toDate = toInput ?? defaultTo;
   const from = isCalendarDate(fromDate)
     ? parseDateTimeInTimezone(`${fromDate}T00:00`, timeZone)
     : null;
@@ -62,7 +67,7 @@ export function getReportPeriod(
       `${defaultFrom}T00:00`,
       timeZone,
     );
-    const defaultEndDate = nextCalendarDate(today);
+    const defaultEndDate = nextCalendarDate(defaultTo);
     const defaultEnd = parseDateTimeInTimezone(
       `${defaultEndDate}T00:00`,
       timeZone,
@@ -78,7 +83,7 @@ export function getReportPeriod(
       from: defaultStart,
       to: defaultEnd,
       fromDate: defaultFrom,
-      toDate: today,
+      toDate: defaultTo,
       error: "Período inválido. Exibindo os dados do mês atual.",
     };
   }

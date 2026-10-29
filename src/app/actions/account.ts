@@ -8,7 +8,7 @@ import { getAuthenticatedProfessionalId } from "@/lib/authenticated-professional
 import { hasValidProfessionalName } from "@/lib/professional-validation";
 import { verifyFirebaseIdToken } from "@/lib/verify-firebase-token";
 import {
-  createFirebaseSession,
+  clearFirebaseSession,
   getFirebaseSession,
 } from "@/lib/firebase-session";
 import { logAuthEvent } from "@/lib/auth-logger";
@@ -176,19 +176,7 @@ export async function syncProfessionalEmailFromFirebaseAction(
     }
   }
 
-  try {
-    await createFirebaseSession(idToken);
-  } catch (error) {
-    logAuthEvent("account.email_sync_session_refresh_failed", {
-      outcome: "failed",
-      code: error instanceof Error ? error.name : "UNKNOWN_ERROR",
-    });
-    return {
-      error:
-        "E-mail atualizado, mas não foi possível renovar a sessão. Entre novamente.",
-    };
-  }
-
+  await clearFirebaseSession();
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/conta");
   revalidatePath("/dashboard/conta/dados");
@@ -196,7 +184,7 @@ export async function syncProfessionalEmailFromFirebaseAction(
     outcome: "success",
     provider: "password",
   });
-  return { success: "E-mail atualizado e confirmado." };
+  return { success: "E-mail atualizado e sessão encerrada." };
 }
 
 export async function recordFirebasePasswordChangeAction(
