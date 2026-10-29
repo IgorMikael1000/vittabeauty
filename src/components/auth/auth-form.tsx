@@ -19,8 +19,7 @@ import { getFirebaseActionCodeSettings } from "@/lib/firebase-action-settings";
 import { auth, googleProvider } from "@/lib/firebase";
 
 type AuthFormProps = {
-  accountDeletionPending?: boolean;
-  accountDeletionProcessing?: boolean;
+  accountDeleted?: boolean;
   emailChanged?: boolean;
   firebaseSignOutFailed?: boolean;
   registered?: boolean;
@@ -59,8 +58,7 @@ function firebaseErrorMessage(error: unknown): string {
 }
 
 export function AuthForm({
-  accountDeletionPending = false,
-  accountDeletionProcessing = false,
+  accountDeleted = false,
   emailChanged = false,
   firebaseSignOutFailed = false,
   registered = false,
@@ -97,22 +95,13 @@ export function AuthForm({
         );
         return;
       }
-      if (result.accountDeletionPending || result.accountDeletionProcessing) {
+      if (result.error) {
         await signOut(auth).catch((signOutError: unknown) => {
           console.error(
-            "Could not clear Firebase client state during account deletion.",
+            "Could not clear Firebase client state after login failure.",
             signOutError,
           );
         });
-        router.replace(
-          result.accountDeletionPending
-            ? "/login?accountDeletionPending=1"
-            : "/login?accountDeletionProcessing=1",
-        );
-        router.refresh();
-        return;
-      }
-      if (result.error) {
         setError(result.error);
         return;
       }
@@ -259,22 +248,12 @@ export function AuthForm({
           senha.
         </p>
       )}
-      {accountDeletionPending && (
+      {accountDeleted && (
         <p
-          className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
-          role="alert"
-        >
-          Sua solicitação de exclusão foi registrada. O acesso está bloqueado e
-          o processo automático tentará concluir a remoção dos dados.
-        </p>
-      )}
-      {accountDeletionProcessing && (
-        <p
-          className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
           role="status"
         >
-          A exclusão da sua conta está sendo processada. Se ocorrer algum erro,
-          o acesso será bloqueado e novas tentativas serão realizadas.
+          Sua conta foi excluída com sucesso.
         </p>
       )}
       {error && (

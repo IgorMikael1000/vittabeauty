@@ -9,8 +9,6 @@ import { verifyFirebaseIdToken } from "@/lib/verify-firebase-token";
 
 type DeleteAccountResult = {
   error?: string;
-  pending?: boolean;
-  processing?: boolean;
   success?: string;
 };
 
@@ -176,7 +174,6 @@ export async function deleteProfessionalAccountAction(
   await clearFirebaseSession();
   revalidatePath("/", "layout");
   return {
-    processing: true,
-    success: "Solicitação registrada e a exclusão será processada automaticamente.",
+    success: "Sua conta foi excluída com sucesso.",
   };
 }

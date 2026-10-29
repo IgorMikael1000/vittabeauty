@@ -43,10 +43,10 @@ export async function getAuthenticatedProfessionalId(
     redirect("/login");
   }
   if (professional.deletionPendingAt) {
-    redirect("/login?accountDeletionPending=1");
+    redirect("/login");
   }
   if (professional.deletionRequestedAt) {
-    redirect("/login?accountDeletionProcessing=1");
+    redirect("/login");
   }
 
   if (!options.allowExpired) {

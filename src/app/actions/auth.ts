@@ -66,8 +66,6 @@ export async function loginWithFirebaseAction(
   registrationRequired?: boolean;
   email?: string;
   googleRegistration?: boolean;
-  accountDeletionPending?: boolean;
-  accountDeletionProcessing?: boolean;
   success?: boolean;
   error?: string;
 }> {
@@ -182,14 +180,14 @@ export async function loginWithFirebaseAction(
         outcome: "rejected",
         provider,
       });
-      return { accountDeletionPending: true };
+      return { error: "E-mail ou senha inválidos." };
     }
     if (professional.deletionRequestedAt) {
       logAuthEvent("login.account_deletion_processing", {
         outcome: "rejected",
         provider,
       });
-      return { accountDeletionProcessing: true };
+      return { error: "E-mail ou senha inválidos." };
     }
 
     if (professional.email !== identity.email) {
