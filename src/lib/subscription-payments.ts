@@ -14,6 +14,7 @@ type CheckoutPayment = {
   currency?: string;
   paymentMethod?: string;
   paymentType?: string;
+  installments?: number;
   refundedAmount?: number;
   paidAt?: Date;
   expectedProfessionalId?: string;
@@ -28,6 +29,7 @@ export async function syncCheckoutPayment({
   currency,
   paymentMethod,
   paymentType,
+  installments,
   refundedAmount,
   paidAt,
   expectedProfessionalId,
@@ -77,6 +79,7 @@ export async function syncCheckoutPayment({
           currency: currency ?? null,
           paymentMethod: paymentMethod ?? null,
           paymentType: paymentType ?? null,
+          installments: installments ?? null,
           refundedAmount: refundedAmount ?? null,
           paidAt: paidAt ?? null,
         };

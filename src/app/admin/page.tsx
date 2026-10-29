@@ -2,6 +2,12 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getPrismaClient } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin-access";
+import { decimalToCents } from "@/lib/money";
+import {
+  describeMercadoPagoPayment,
+  describePaymentInstallments,
+  estimateMercadoPagoFee,
+} from "@/lib/mercadopago-fees";
 
 export const metadata: Metadata = {
   title: "Administração",
@@ -24,6 +30,18 @@ function formatCurrency(value: number): string {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
+  }).format(value);
+}
+
+function formatCents(value: number): string {
+  return formatCurrency(value / 100);
+}
+
+function formatPercent(value: number | null): string {
+  if (value === null) return "Não disponível";
+  return new Intl.NumberFormat("pt-BR", {
+    style: "percent",
+    maximumFractionDigits: 2,
   }).format(value);
 }
 
@@ -87,6 +105,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     newProfessionals,
     paidPayments,
     paymentsWithoutAmount,
+    approvedPaymentDetails,
     pendingPayments,
     refundedPayments,
     recentProfessionals,
@@ -118,7 +137,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         status: "approved",
         paidAt: { gte: rangeStart, lte: rangeEnd },
       },
-      _sum: { amount: true, refundedAmount: true },
+      _sum: { amount: true },
       _count: { _all: true },
     }),
     prisma.subscriptionPayment.count({
@@ -127,6 +146,20 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         status: "approved",
         amount: null,
         paidAt: { gte: rangeStart, lte: rangeEnd },
+      },
+    }),
+    prisma.subscriptionPayment.findMany({
+      where: {
+        ...professionalPaymentsOnly,
+        status: "approved",
+        paidAt: { gte: rangeStart, lte: rangeEnd },
+      },
+      select: {
+        amount: true,
+        refundedAmount: true,
+        paymentMethod: true,
+        paymentType: true,
+        installments: true,
       },
     }),
     prisma.subscriptionPayment.count({
@@ -181,6 +214,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         currency: true,
         paymentMethod: true,
         paymentType: true,
+        installments: true,
         status: true,
         statusDetail: true,
         refundedAmount: true,
@@ -189,10 +223,82 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       },
     }),
   ]);
-  const revenue =
-    (paidPayments._sum.amount?.toNumber() ?? 0) -
-    (paidPayments._sum.refundedAmount?.toNumber() ?? 0);
+  const grossRevenueCents = decimalToCents(
+    paidPayments._sum.amount ?? "0",
+  );
+  let estimatedFeeCents = 0;
+  let recognizedGrossCents = 0;
+  let estimatedNetCents = 0;
+  let feeRecognizedPaymentCount = 0;
+
+  for (const payment of approvedPaymentDetails) {
+    if (payment.amount === null) continue;
+
+    const amountCents = decimalToCents(payment.amount);
+    const fee = estimateMercadoPagoFee({
+      amountCents,
+      paymentMethod: payment.paymentMethod,
+      paymentType: payment.paymentType,
+      installments: payment.installments,
+    });
+    if (!fee) continue;
+
+    const refundedCents = Math.min(
+      amountCents,
+      decimalToCents(payment.refundedAmount ?? "0"),
+    );
+    estimatedFeeCents += fee.feeCents;
+    recognizedGrossCents += amountCents;
+    estimatedNetCents += amountCents - fee.feeCents - refundedCents;
+    feeRecognizedPaymentCount += 1;
+  }
+
+  const unpricedPaymentCount =
+    paidPayments._count._all - feeRecognizedPaymentCount;
+  const averageFeeRate =
+    recognizedGrossCents > 0
+      ? estimatedFeeCents / recognizedGrossCents
+      : null;
   const unknownHistoricalCount = paymentsWithoutAmount;
+  const paymentRows = recentPayments.map((payment) => {
+    const amountCents =
+      payment.amount === null ? null : decimalToCents(payment.amount);
+    const fee =
+      payment.status === "approved" && amountCents !== null
+        ? estimateMercadoPagoFee({
+            amountCents,
+            paymentMethod: payment.paymentMethod,
+            paymentType: payment.paymentType,
+            installments: payment.installments,
+          })
+        : null;
+    const refundedCents =
+      amountCents === null
+        ? 0
+        : Math.min(
+            amountCents,
+            decimalToCents(payment.refundedAmount ?? "0"),
+          );
+    const netCents =
+      amountCents !== null && fee
+        ? amountCents - fee.feeCents - refundedCents
+        : null;
+
+    return {
+      ...payment,
+      amountCents,
+      feeCents: fee?.feeCents ?? null,
+      netCents,
+      paymentDescription: describeMercadoPagoPayment({
+        paymentMethod: payment.paymentMethod,
+        paymentType: payment.paymentType,
+      }),
+      installmentDescription: describePaymentInstallments({
+        installments: payment.installments,
+        paymentType: payment.paymentType,
+      }),
+    };
+  });
 
   return (
     <section>
@@ -236,29 +342,94 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         </form>
       </div>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {[
-          { label: "Receita líquida confirmada", value: formatCurrency(revenue) },
-          { label: "Pagamentos aprovados", value: String(paidPayments._count._all) },
-          { label: "Profissionais", value: String(totalProfessionals) },
-          { label: "Acesso vigente", value: String(activeProfessionals) },
-          { label: "Trials vigentes", value: String(trialProfessionals) },
-          { label: "Acessos expirados", value: String(expiredProfessionals) },
-          { label: "Novos cadastros no período", value: String(newProfessionals) },
-          { label: "Pagamentos pendentes", value: String(pendingPayments) },
-          { label: "Pagamentos reembolsados/contestados", value: String(refundedPayments) },
-        ].map((metric) => (
-          <article
-            className="rounded-2xl border border-vitta-border bg-white p-4 shadow-card"
-            key={metric.label}
-          >
-            <p className="text-xs font-medium text-vitta-muted">{metric.label}</p>
-            <p className="mt-2 text-2xl font-semibold tracking-tight text-vitta-text">
-              {metric.value}
-            </p>
-          </article>
-        ))}
-      </div>
+      <section className="mt-6">
+        <h2 className="mb-3 text-sm font-semibold text-vitta-text">
+          Resumo financeiro do período
+        </h2>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            {
+              label: "Faturamento bruto",
+              value: formatCents(grossRevenueCents),
+              detail: "Pagamentos aprovados, antes de taxas e estornos",
+            },
+            {
+              label: "Taxas estimadas",
+              value: formatCents(estimatedFeeCents),
+              detail: `${feeRecognizedPaymentCount} pagamentos com tarifa identificada`,
+            },
+            {
+              label: "Líquido estimado",
+              value: formatCents(estimatedNetCents),
+              detail: `Após taxas e estornos nos pagamentos calculados (${feeRecognizedPaymentCount})`,
+            },
+            {
+              label: "Taxa média efetiva",
+              value: formatPercent(averageFeeRate),
+              detail: `Ponderada pelo valor dos ${feeRecognizedPaymentCount} pagamentos calculados`,
+            },
+          ].map((metric) => (
+            <article
+              className="rounded-2xl border border-vitta-border bg-white p-4 shadow-card"
+              key={metric.label}
+            >
+              <p className="text-xs font-medium text-vitta-muted">
+                {metric.label}
+              </p>
+              <p className="mt-2 text-2xl font-semibold tracking-tight text-vitta-text">
+                {metric.value}
+              </p>
+              <p className="mt-2 text-xs leading-5 text-vitta-muted">
+                {metric.detail}
+              </p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-6">
+        <h2 className="mb-3 text-sm font-semibold text-vitta-text">
+          Indicadores da plataforma
+        </h2>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            { label: "Pagamentos aprovados", value: String(paidPayments._count._all) },
+            { label: "Profissionais", value: String(totalProfessionals) },
+            { label: "Acesso vigente", value: String(activeProfessionals) },
+            { label: "Trials vigentes", value: String(trialProfessionals) },
+            { label: "Acessos expirados", value: String(expiredProfessionals) },
+            { label: "Novos cadastros no período", value: String(newProfessionals) },
+            { label: "Pagamentos pendentes", value: String(pendingPayments) },
+            { label: "Pagamentos reembolsados/contestados", value: String(refundedPayments) },
+          ].map((metric) => (
+            <article
+              className="rounded-2xl border border-vitta-border bg-white p-4 shadow-card"
+              key={metric.label}
+            >
+              <p className="text-xs font-medium text-vitta-muted">
+                {metric.label}
+              </p>
+              <p className="mt-2 text-2xl font-semibold tracking-tight text-vitta-text">
+                {metric.value}
+              </p>
+            </article>
+          ))}
+        </div>
+      </section>
+      {unpricedPaymentCount > 0 && (
+        <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-950">
+          Não foi possível estimar a taxa de {unpricedPaymentCount} pagamento(s)
+          aprovado(s) do período porque a forma de pagamento, o parcelamento ou
+          uma tarifa correspondente não está disponível. Esses pagamentos
+          aparecem no faturamento bruto, mas ficam fora dos totais líquidos e
+          da taxa média calculada.
+        </p>
+      )}
+      <p className="mt-3 text-xs leading-5 text-vitta-muted">
+        Taxas estimadas conforme a tabela informada para o Mercado Pago. O valor
+        líquido considera somente pagamentos com tarifa identificada e desconta
+        estornos registrados.
+      </p>
       {unknownHistoricalCount > 0 && (
         <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-950">
           Existem {unknownHistoricalCount} pagamentos aprovados neste período
@@ -335,24 +506,31 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             Pagamentos do Mercado Pago
           </h2>
           <p className="mt-1 text-xs text-vitta-muted">
-            Até 100 registros criados ou pagos no período selecionado.
+            Até 100 registros criados ou pagos no período selecionado. Valores
+            líquidos e taxas são estimativas conforme a forma de pagamento.
           </p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-left text-sm">
+          <table className="w-full min-w-[1320px] text-left text-sm">
             <thead className="bg-[#faf7fb] text-xs text-vitta-muted">
               <tr>
                 <th className="px-5 py-3 font-semibold">Pagamento</th>
                 <th className="px-5 py-3 font-semibold">Profissional</th>
                 <th className="px-5 py-3 font-semibold">Plano</th>
-                <th className="px-5 py-3 font-semibold">Valor</th>
-                <th className="px-5 py-3 font-semibold">Meio</th>
+                <th className="px-5 py-3 text-right font-semibold">Bruto</th>
+                <th className="px-5 py-3 text-right font-semibold">Taxa</th>
+                <th className="px-5 py-3 text-right font-semibold">
+                  Líquido estimado
+                </th>
+                <th className="px-5 py-3 font-semibold">
+                  Forma de pagamento
+                </th>
                 <th className="px-5 py-3 font-semibold">Status</th>
                 <th className="px-5 py-3 font-semibold">Data</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-vitta-border">
-              {recentPayments.map((payment) => (
+              {paymentRows.map((payment) => (
                 <tr key={payment.mercadoPagoPaymentId}>
                   <td className="px-5 py-3 font-mono text-xs text-vitta-muted">
                     {payment.mercadoPagoPaymentId}
@@ -368,10 +546,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   <td className="px-5 py-3 text-vitta-text">
                     {planLabels[payment.planType] ?? payment.planType}
                   </td>
-                  <td className="px-5 py-3 text-vitta-text">
-                    {payment.amount
-                      ? formatCurrency(payment.amount.toNumber())
-                      : "Valor indisponível"}
+                  <td className="px-5 py-3 text-right text-vitta-text">
+                    {payment.amountCents === null
+                      ? "Valor indisponível"
+                      : formatCents(payment.amountCents)}
                     {payment.refundedAmount &&
                       payment.refundedAmount.toNumber() > 0 && (
                         <span className="block text-xs text-red-700">
@@ -380,10 +558,27 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                         </span>
                       )}
                   </td>
+                  <td className="px-5 py-3 text-right text-vitta-muted">
+                    {payment.status !== "approved"
+                      ? "—"
+                      : payment.feeCents === null
+                        ? "Não calculada"
+                        : formatCents(payment.feeCents)}
+                  </td>
+                  <td className="px-5 py-3 text-right font-medium text-vitta-text">
+                    {payment.status !== "approved"
+                      ? "—"
+                      : payment.netCents === null
+                        ? "Não calculado"
+                        : formatCents(payment.netCents)}
+                  </td>
                   <td className="px-5 py-3 text-vitta-muted">
-                    {[payment.paymentType, payment.paymentMethod]
-                      .filter(Boolean)
-                      .join(" · ") || "Não informado"}
+                    <span>{payment.paymentDescription}</span>
+                    {payment.installmentDescription && (
+                      <span className="mt-1 block text-xs text-vitta-muted">
+                        {payment.installmentDescription}
+                      </span>
+                    )}
                   </td>
                   <td className="px-5 py-3 text-vitta-text">
                     {paymentStatusLabels[payment.status] ?? payment.status}
@@ -402,7 +597,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 <tr>
                   <td
                     className="px-5 py-8 text-center text-sm text-vitta-muted"
-                    colSpan={7}
+                    colSpan={9}
                   >
                     Nenhum pagamento com data no período selecionado.
                   </td>

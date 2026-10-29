@@ -93,6 +93,7 @@ export default async function SubscriptionPage({
               currency: payment.currency_id,
               paymentMethod: payment.payment_method_id,
               paymentType: payment.payment_type_id,
+              installments: payment.installments,
               refundedAmount: payment.transaction_amount_refunded,
               paidAt: new Date(paidAtValue),
               expectedProfessionalId: professionalId,

@@ -187,6 +187,7 @@ model SubscriptionPayment {
   currency             String?
   paymentMethod        String?
   paymentType          String?
+  installments         Int?
   status               String       @default("approved")
   statusDetail         String?
   refundedAmount       Decimal?     @db.Decimal(10, 2)
