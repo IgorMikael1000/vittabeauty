@@ -1,10 +1,8 @@
 "use server";
 
 import { Prisma } from "@/generated/prisma/client";
-import { compare } from "bcryptjs";
 import { getCpfDigits, hasValidProfessionalName, isValidCpf } from "@/lib/professional-validation";
 import {
-  verifyFirebaseIdToken,
   verifyFirebaseIdTokenWithDiagnostics,
 } from "@/lib/verify-firebase-token";
 import { logAuthEvent } from "@/lib/auth-logger";
@@ -198,12 +196,7 @@ export async function loginWithFirebaseAction(
     if (!professional.firebaseUid) {
       await prisma.professional.update({
         where: { id: professional.id },
-        data: { firebaseUid: identity.uid, passwordHash: null },
-      });
-    } else {
-      await prisma.professional.updateMany({
-        where: { id: professional.id, firebaseUid: identity.uid },
-        data: { passwordHash: null },
+        data: { firebaseUid: identity.uid },
       });
     }
 
@@ -552,107 +545,6 @@ export async function registerAction(
       error: "Não foi possível consultar ou salvar seu cadastro.",
     };
   }
-}
-
-export async function verifyLegacyCredentialsAction(
-  emailInput: string,
-  password: string,
-): Promise<boolean> {
-  try {
-    const rateLimit = await checkRequestRateLimit("login");
-    if (!rateLimit.allowed) return false;
-  } catch (error) {
-    if (!(error instanceof RequestRateLimitUnavailableError)) throw error;
-    logAuthEvent("login.rate_limit_unavailable", {
-      outcome: "failed",
-      code: "RATE_LIMIT_UNAVAILABLE",
-    });
-    return false;
-  }
-
-  const email = emailInput.trim().toLowerCase();
-  if (
-    !emailPattern.test(email) ||
-    email.length > 254 ||
-    !password ||
-    new TextEncoder().encode(password).length > 72
-  ) {
-    return false;
-  }
-
-  const professional = await getPrismaClient().professional.findUnique({
-    where: { email },
-    select: { passwordHash: true, firebaseUid: true },
-  });
-  if (!professional?.passwordHash || professional.firebaseUid) {
-    return false;
-  }
-
-  return compare(password, professional.passwordHash);
-}
-
-export async function linkLegacyFirebaseAccountAction(
-  idToken: string,
-): Promise<FormState> {
-  let rateLimit;
-  try {
-    rateLimit = await checkRequestRateLimit("registration");
-  } catch (error) {
-    if (!(error instanceof RequestRateLimitUnavailableError)) throw error;
-    logAuthEvent("registration.rate_limit_unavailable", {
-      outcome: "failed",
-      code: "RATE_LIMIT_UNAVAILABLE",
-    });
-    return {
-      error: "O cadastro está temporariamente indisponível. Tente novamente.",
-    };
-  }
-  if (!rateLimit.allowed) {
-    return {
-      error: `Muitas tentativas de cadastro. Aguarde ${Math.ceil(
-        rateLimit.retryAfterSeconds / 60,
-      )} min e tente novamente.`,
-    };
-  }
-
-  const identity = await verifyFirebaseIdToken(idToken);
-  if (
-    !identity ||
-    identity.emailVerified ||
-    !identity.providers.includes("password")
-  ) {
-    return { error: "Não foi possível vincular a conta Firebase." };
-  }
-
-  const prisma = getPrismaClient();
-  const professional = await prisma.professional.findUnique({
-    where: { email: identity.email },
-    select: { id: true, firebaseUid: true, passwordHash: true },
-  });
-  if (
-    !professional ||
-    professional.firebaseUid ||
-    !professional.passwordHash
-  ) {
-    return { error: "Não foi possível vincular a conta Firebase." };
-  }
-
-  try {
-    await prisma.professional.update({
-      where: { id: professional.id },
-      data: { firebaseUid: identity.uid, passwordHash: null },
-    });
-  } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
-      return { error: "Não foi possível vincular a conta Firebase." };
-    }
-    throw error;
-  }
-
-  return { success: "Conta Firebase vinculada." };
 }
 
 export async function logoutAction(): Promise<void> {

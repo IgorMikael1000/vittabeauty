@@ -51,8 +51,6 @@ model Professional {
   expiresAt            DateTime              @default(dbgenerated("(CURRENT_TIMESTAMP + INTERVAL '3 days')"))
   hasSeenWelcome       Boolean               @default(false)
   role                 ProfessionalRole      @default(PROFESSIONAL)
-  mpSubscriptionId     String?
-  passwordHash         String?
   slug                 String                @unique
   timezone             String                @default("America/Sao_Paulo")
   createdAt            DateTime              @default(now())
@@ -67,7 +65,6 @@ model Professional {
   subscriptionPayments SubscriptionPayment[]
 
   @@index([createdAt])
-  @@index([mpSubscriptionId])
 }
 
 model Client {

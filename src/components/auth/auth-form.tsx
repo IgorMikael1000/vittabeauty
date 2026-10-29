@@ -5,16 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 import {
-  createUserWithEmailAndPassword,
   sendEmailVerification,
   signInWithEmailAndPassword,
   signInWithPopup,
   type User,
 } from "firebase/auth";
 import {
-  linkLegacyFirebaseAccountAction,
   loginWithFirebaseAction,
-  verifyLegacyCredentialsAction,
 } from "@/app/actions/auth";
 import { PasswordInput } from "@/components/forms/password-input";
 import { getFirebaseActionCodeSettings } from "@/lib/firebase-action-settings";
@@ -146,38 +143,8 @@ export function AuthForm({
           code === "auth/user-not-found" ||
           code === "auth/invalid-credential"
         ) {
-          try {
-            const isLegacyAccount = await verifyLegacyCredentialsAction(
-              submittedEmail,
-              password,
-            );
-            if (isLegacyAccount) {
-              const credential = await createUserWithEmailAndPassword(
-                auth,
-                submittedEmail,
-                password,
-              );
-              await sendEmailVerification(
-                credential.user,
-                getFirebaseActionCodeSettings(),
-              );
-              const result = await linkLegacyFirebaseAccountAction(
-                await credential.user.getIdToken(true),
-              );
-              if (result.error) {
-                setError(result.error);
-                return;
-              }
-              setVerificationUser(credential.user);
-              setError(
-                "Sua conta foi migrada. Confirme o e-mail enviado para liberar o acesso.",
-              );
-              return;
-            }
-          } catch (migrationError) {
-            setError(firebaseErrorMessage(migrationError));
-            return;
-          }
+          setError(firebaseErrorMessage(authError));
+          return;
         }
         setError(firebaseErrorMessage(authError));
         return;
