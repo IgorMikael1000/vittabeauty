@@ -38,7 +38,7 @@ export async function generateMetadata({
   const { slug } = await params;
   const professional = await getPrismaClient().professional.findUnique({
     where: { slug },
-    select: { name: true, specialty: true, logoUrl: true },
+    select: { name: true, specialty: true, logoUrl: true, updatedAt: true },
   });
 
   if (!professional) {
@@ -55,7 +55,12 @@ export async function generateMetadata({
   const bookingUrl = await getPublicBookingUrl(slug);
   const profileImageUrl = professional.logoUrl?.startsWith("https://")
     ? professional.logoUrl
-    : new URL("/brand/logo_vitta.png", bookingUrl).toString();
+    : professional.logoUrl?.startsWith("data:image/webp;base64,")
+      ? new URL(
+          `/api/professionals/${encodeURIComponent(slug)}/profile-image/${professional.updatedAt.getTime()}`,
+          bookingUrl,
+        ).toString()
+      : new URL("/brand/logo_vitta.png", bookingUrl).toString();
 
   return {
     title: `Agendar com ${professional.name}`,
