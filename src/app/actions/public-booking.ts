@@ -27,6 +27,56 @@ import { createMercadoPagoPixDeposit } from "@/lib/mercadopago-deposit-payments"
 
 class BookingUnavailableError extends Error {}
 
+function getPixFailureDiagnostics(error: unknown): Record<string, unknown> {
+  if (typeof error !== "object" || error === null) {
+    return { errorType: typeof error };
+  }
+
+  const details = error as {
+    name?: unknown;
+    status?: unknown;
+    error?: unknown;
+    causes?: unknown;
+  };
+  const diagnostics: Record<string, unknown> = {};
+
+  if (typeof details.name === "string") {
+    diagnostics.errorType = details.name.slice(0, 80);
+  }
+  if (
+    typeof details.status === "number" &&
+    Number.isInteger(details.status) &&
+    details.status >= 0 &&
+    details.status <= 599
+  ) {
+    diagnostics.providerHttpStatus = details.status;
+  }
+  if (
+    typeof details.error === "string" &&
+    /^[a-zA-Z0-9_.-]{1,80}$/.test(details.error)
+  ) {
+    diagnostics.providerError = details.error;
+  }
+  if (Array.isArray(details.causes)) {
+    diagnostics.providerCauseCodes = details.causes
+      .slice(0, 5)
+      .flatMap((cause: unknown) => {
+        if (typeof cause !== "object" || cause === null || !("code" in cause)) {
+          return [];
+        }
+        const code = cause.code;
+        return typeof code === "string" &&
+          /^[a-zA-Z0-9_.-]{1,80}$/.test(code)
+          ? [code]
+          : typeof code === "number" && Number.isFinite(code)
+            ? [String(code)]
+            : [];
+      });
+  }
+
+  return diagnostics;
+}
+
 export async function createPublicBookingAction(
   _previousState: FormState,
   formData: FormData,
@@ -381,6 +431,7 @@ export async function createPublicBookingAction(
   }
 
   if (depositPaymentExpiresAt) {
+    let pixCreationPhase = "provider_request";
     try {
       const pixPayment = await createMercadoPagoPixDeposit({
         professionalId: professional.id,
@@ -390,6 +441,7 @@ export async function createPublicBookingAction(
         payerName: name,
         expiresAt: depositPaymentExpiresAt,
       });
+      pixCreationPhase = "persisting_payment_record";
       const paymentSaved =
         await prisma.appointmentDepositPayment.updateMany({
           where: {
@@ -425,7 +477,8 @@ export async function createPublicBookingAction(
     } catch (error) {
       console.error("[mercadopago-deposit] Pix payment creation failed.", {
         appointmentId,
-        code: error instanceof Error ? error.name : "UNKNOWN_ERROR",
+        phase: pixCreationPhase,
+        ...getPixFailureDiagnostics(error),
       });
       await prisma.appointmentDepositPayment.updateMany({
         where: { appointmentId, status: { not: "approved" } },
