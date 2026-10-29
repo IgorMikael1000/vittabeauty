@@ -3,7 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { clearFirebaseSession, getFirebaseSession } from "@/lib/firebase-session";
 import { getCpfDigits } from "@/lib/professional-validation";
-import { logAuthEvent } from "@/lib/auth-logger";
+import {
+  getAccountDeletionErrorDetails,
+  logAccountDeletionEvent,
+} from "@/lib/account-deletion-logger";
 import { getPrismaClient } from "@/lib/prisma";
 import { verifyFirebaseIdToken } from "@/lib/verify-firebase-token";
 
@@ -35,11 +38,25 @@ export async function deleteProfessionalAccountAction(
   cpfInput: string,
   idToken: string,
 ): Promise<DeleteAccountResult> {
-  const session = await getFirebaseSession();
+  logAccountDeletionEvent("request.started", { outcome: "started" });
+
+  let session;
+  try {
+    session = await getFirebaseSession();
+  } catch (error) {
+    logAccountDeletionEvent("request.failed", {
+      outcome: "failed",
+      stage: "session_lookup",
+      ...getAccountDeletionErrorDetails(error),
+    });
+    return { error: "Não foi possível validar sua sessão. Tente novamente." };
+  }
+
   if (!session) {
-    logAuthEvent("account.deletion_rejected", {
+    logAccountDeletionEvent("request.rejected", {
       outcome: "rejected",
       code: "SESSION_MISSING",
+      stage: "session_lookup",
     });
     return { error: "Sua sessão expirou. Entre novamente para continuar." };
   }
@@ -52,37 +69,87 @@ export async function deleteProfessionalAccountAction(
     typeof idToken !== "string" ||
     idToken.length > 10_000
   ) {
+    logAccountDeletionEvent("request.rejected", {
+      outcome: "rejected",
+      code: "INVALID_INPUT",
+      stage: "input_validation",
+    });
     return { error: "Confirme o e-mail e o CPF cadastrados." };
   }
 
-  const identity = await verifyFirebaseIdToken(idToken);
+  let identity;
+  try {
+    identity = await verifyFirebaseIdToken(idToken);
+  } catch (error) {
+    logAccountDeletionEvent("request.failed", {
+      outcome: "failed",
+      stage: "firebase_identity_verification",
+      ...getAccountDeletionErrorDetails(error),
+    });
+    return {
+      error: "Não foi possível confirmar sua identidade. Tente novamente.",
+    };
+  }
+
   if (!identity || identity.uid !== session.uid) {
-    logAuthEvent("account.deletion_rejected", {
+    logAccountDeletionEvent("request.rejected", {
       outcome: "rejected",
       code: "FIREBASE_IDENTITY_MISMATCH",
+      stage: "firebase_identity_verification",
     });
     return { error: "Não foi possível confirmar sua identidade. Entre novamente." };
   }
 
-  const prisma = getPrismaClient();
-  const professional = await prisma.professional.findUnique({
-    where: { firebaseUid: session.uid },
-    select: {
-      id: true,
-      email: true,
-      cpf: true,
-      deletionRequestedAt: true,
-      deletionPendingAt: true,
-      logoUrl: true,
-    },
-  });
+  let prisma: ReturnType<typeof getPrismaClient>;
+  try {
+    prisma = getPrismaClient();
+  } catch (error) {
+    logAccountDeletionEvent("request.failed", {
+      outcome: "failed",
+      stage: "database_client_initialization",
+      ...getAccountDeletionErrorDetails(error),
+    });
+    return { error: "Não foi possível acessar os dados da conta. Tente novamente." };
+  }
+
+  let professional;
+  try {
+    professional = await prisma.professional.findUnique({
+      where: { firebaseUid: session.uid },
+      select: {
+        id: true,
+        email: true,
+        cpf: true,
+        deletionRequestedAt: true,
+        deletionPendingAt: true,
+        logoUrl: true,
+      },
+    });
+  } catch (error) {
+    logAccountDeletionEvent("request.failed", {
+      outcome: "failed",
+      stage: "professional_lookup",
+      ...getAccountDeletionErrorDetails(error),
+    });
+    return { error: "Não foi possível localizar sua conta. Tente novamente." };
+  }
+
   if (!professional) {
-    logAuthEvent("account.deleted", {
+    logAccountDeletionEvent("request.already_deleted", {
       outcome: "success",
       code: "ALREADY_DELETED",
+      stage: "professional_lookup",
     });
-    await clearFirebaseSession();
-    return { success: "Conta excluída." };
+    try {
+      await clearFirebaseSession();
+    } catch (error) {
+      logAccountDeletionEvent("session_cleanup.failed", {
+        outcome: "failed",
+        stage: "session_cleanup",
+        ...getAccountDeletionErrorDetails(error),
+      });
+    }
+    return { success: "Sua conta já foi excluída." };
   }
 
   const nowSeconds = Math.floor(Date.now() / 1000);
@@ -92,9 +159,10 @@ export async function deleteProfessionalAccountAction(
     (identity.authTime > nowSeconds + 30 ||
       nowSeconds - identity.authTime > 5 * 60)
   ) {
-    logAuthEvent("account.deletion_rejected", {
+    logAccountDeletionEvent("request.rejected", {
       outcome: "rejected",
       code: "RECENT_LOGIN_REQUIRED",
+      stage: "recent_authentication_check",
     });
     return {
       error: "Confirme sua identidade novamente para excluir a conta.",
@@ -102,9 +170,10 @@ export async function deleteProfessionalAccountAction(
   }
 
   if (!professional.cpf) {
-    logAuthEvent("account.deletion_rejected", {
+    logAccountDeletionEvent("request.rejected", {
       outcome: "rejected",
       code: "PROFILE_CPF_MISSING",
+      stage: "confirmation_validation",
     });
     return {
       error:
@@ -116,9 +185,10 @@ export async function deleteProfessionalAccountAction(
     emailInput.trim().toLowerCase() !== professional.email.toLowerCase() ||
     getCpfDigits(cpfInput) !== getCpfDigits(professional.cpf)
   ) {
-    logAuthEvent("account.deletion_rejected", {
+    logAccountDeletionEvent("request.rejected", {
       outcome: "rejected",
       code: "CONFIRMATION_MISMATCH",
+      stage: "confirmation_validation",
     });
     return { error: "O e-mail ou CPF informado não corresponde ao cadastro." };
   }
@@ -157,9 +227,11 @@ export async function deleteProfessionalAccountAction(
       return job.id;
     });
   } catch (error) {
-    logAuthEvent("account.deletion_request_failed", {
+    logAccountDeletionEvent("request.failed", {
       outcome: "failed",
-      code: error instanceof Error ? error.name : "UNKNOWN_ERROR",
+      stage: "job_persistence",
+      correlationId: professional.id,
+      ...getAccountDeletionErrorDetails(error),
     });
     return {
       error:
@@ -167,13 +239,33 @@ export async function deleteProfessionalAccountAction(
     };
   }
 
-  logAuthEvent("account.deletion_requested", {
-    outcome: "started",
+  logAccountDeletionEvent("request.queued", {
+    outcome: "success",
+    stage: "job_persistence",
     correlationId: jobId,
   });
-  await clearFirebaseSession();
-  revalidatePath("/", "layout");
+  try {
+    await clearFirebaseSession();
+  } catch (error) {
+    logAccountDeletionEvent("session_cleanup.failed", {
+      outcome: "failed",
+      stage: "session_cleanup",
+      correlationId: jobId,
+      ...getAccountDeletionErrorDetails(error),
+    });
+  }
+  try {
+    revalidatePath("/", "layout");
+  } catch (error) {
+    logAccountDeletionEvent("cache_revalidation.failed", {
+      outcome: "failed",
+      stage: "cache_revalidation",
+      correlationId: jobId,
+      ...getAccountDeletionErrorDetails(error),
+    });
+  }
   return {
-    success: "Sua conta foi excluída com sucesso.",
+    success:
+      "Sua solicitação de exclusão foi registrada. A remoção será concluída automaticamente em até 24 horas.",
   };
 }

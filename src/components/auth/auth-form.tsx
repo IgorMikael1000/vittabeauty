@@ -253,7 +253,8 @@ export function AuthForm({
           className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
           role="status"
         >
-          Sua conta foi excluída com sucesso.
+          Sua solicitação de exclusão foi registrada. A remoção será concluída
+          automaticamente em até 24 horas.
         </p>
       )}
       {error && (

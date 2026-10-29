@@ -197,10 +197,12 @@ remover o suporte legado.
   Upstash Redis. Configure `UPSTASH_REDIS_REST_URL` e
   `UPSTASH_REDIS_REST_TOKEN` no servidor antes da exposição à internet; sem
   essas credenciais ou sem acesso ao Redis, as ações são recusadas.
-- A exclusão da conta marca primeiro o perfil com `deletionPendingAt`, bloqueia
-  o acesso autenticado e desativa o agendamento público, registrando uma tarefa
-  persistente. O Cron da Vercel remove o usuário do Firebase, a foto do Cloudinary
-  e os dados relacionais; falhas são retentadas automaticamente com backoff.
+- A exclusão da conta registra primeiro a solicitação em `deletionRequestedAt`,
+  bloqueia o acesso autenticado e desativa o agendamento público, registrando
+  uma tarefa persistente. O Cron da Vercel executa diariamente às 03:00 UTC e
+  remove o usuário do Firebase, a foto do Cloudinary e os dados relacionais;
+  portanto, a conclusão pode levar até 24 horas. Falhas são registradas nos logs
+  da função e retentadas automaticamente com backoff.
 - O trial profissional dura três dias a partir do cadastro. Após o vencimento,
   o dashboard exige a escolha de um plano; o link público de agendamento fica
   indisponível até que um pagamento de plano seja confirmado.
