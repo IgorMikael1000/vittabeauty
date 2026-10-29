@@ -75,6 +75,18 @@ diferenças.
 Para produção, aplique as migrations pendentes com `npm run db:migrate:deploy`
 antes de disponibilizar a versão correspondente.
 
+### Teste de conexão OAuth do Mercado Pago
+
+O fluxo experimental de autorização fica disponível somente por acesso direto
+ao endpoint autenticado
+`/api/integrations/mercadopago/connect`; ainda não há botão ou tela no painel.
+Configure `MERCADOPAGO_CLIENT_ID`, `MERCADOPAGO_CLIENT_SECRET` e
+`MERCADOPAGO_OAUTH_REDIRECT_URI` no ambiente do servidor. Cadastre no Mercado
+Pago a URL estática exata apontada pela última variável, por exemplo
+`https://seu-dominio/api/integrations/mercadopago/callback`, e habilite PKCE
+na aplicação. O callback valida o retorno e consulta a conta autorizada, mas
+nesta etapa descarta o token e não salva credenciais nem inicia cobranças.
+
 ### Cloudinary para fotos de perfil
 
 As fotos de perfil são enviadas pelo servidor ao Cloudinary, e o PostgreSQL
