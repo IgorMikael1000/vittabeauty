@@ -37,7 +37,7 @@ export async function generateMetadata({
 }: Pick<BookingPageProps, "params">): Promise<Metadata> {
   const { slug } = await params;
   const professional = await getPrismaClient().professional.findUnique({
-    where: { slug },
+    where: { slug, deletionPendingAt: null },
     select: { name: true, specialty: true, logoUrl: true, updatedAt: true },
   });
 

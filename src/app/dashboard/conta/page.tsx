@@ -23,8 +23,8 @@ const accountOptions = [
   },
   {
     href: "/dashboard/conta/assinatura",
-    title: "Assinatura",
-    description: "Consulte seu plano e gerencie os pagamentos.",
+    title: "Plano e pagamentos",
+    description: "Consulte seu acesso e faça renovações manuais.",
     icon: "subscription",
   },
   {

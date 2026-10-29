@@ -1,5 +1,6 @@
 "use server";
 
+import { v2 as cloudinary } from "cloudinary";
 import { Prisma } from "@/generated/prisma/client";
 import { revalidatePath } from "next/cache";
 import type { FormState } from "@/app/actions/auth";
@@ -225,21 +226,19 @@ export async function recordFirebasePasswordChangeAction(
 }
 
 export async function updateProfileImageAction(
-  logoUrl: string,
+  imageDataUrl: string,
 ): Promise<FormState> {
   const professionalId = await getAuthenticatedProfessionalId();
 
   if (
-    typeof logoUrl !== "string" ||
-    new TextEncoder().encode(logoUrl).byteLength > 50 * 1024
+    typeof imageDataUrl !== "string" ||
+    new TextEncoder().encode(imageDataUrl).byteLength > 70 * 1024
   ) {
     return { error: "A imagem deve ter no máximo 50 KB." };
   }
 
-  const imageMatch = /^data:image\/webp;base64,([A-Za-z0-9+/]+={0,2})$/.exec(
-    logoUrl,
-  );
-
+  const imageMatch =
+    /^data:image\/webp;base64,([A-Za-z0-9+/]+={0,2})$/.exec(imageDataUrl);
   if (!imageMatch) {
     return { error: "Envie uma imagem WebP válida." };
   }
@@ -247,16 +246,58 @@ export async function updateProfileImageAction(
   const imageBytes = Buffer.from(imageMatch[1], "base64");
   if (
     imageBytes.length < 12 ||
+    imageBytes.length > 50 * 1024 ||
     imageBytes.toString("base64") !== imageMatch[1] ||
     imageBytes.toString("ascii", 0, 4) !== "RIFF" ||
     imageBytes.toString("ascii", 8, 12) !== "WEBP"
   ) {
-    return { error: "Envie uma imagem WebP válida." };
+    return { error: "Envie uma imagem WebP válida de até 50 KB." };
+  }
+
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+  if (!cloudName || !apiKey || !apiSecret) {
+    throw new Error("Cloudinary server credentials are not configured.");
+  }
+
+  cloudinary.config({
+    cloud_name: cloudName,
+    api_key: apiKey,
+    api_secret: apiSecret,
+    secure: true,
+  });
+
+  let uploadedImage: Awaited<ReturnType<typeof cloudinary.uploader.upload>>;
+  try {
+    uploadedImage = await cloudinary.uploader.upload(imageDataUrl, {
+      public_id: `profile-images/${professionalId}`,
+      overwrite: true,
+      invalidate: true,
+      resource_type: "image",
+      format: "webp",
+    });
+  } catch (error) {
+    console.error("[Cloudinary] Profile image upload failed.", {
+      code: error instanceof Error ? error.name : "UNKNOWN_ERROR",
+    });
+    return {
+      error: "Não foi possível enviar a foto. Tente novamente mais tarde.",
+    };
+  }
+
+  if (
+    uploadedImage.resource_type !== "image" ||
+    uploadedImage.format !== "webp" ||
+    uploadedImage.bytes > 50 * 1024 ||
+    !uploadedImage.secure_url
+  ) {
+    throw new Error("Cloudinary returned an invalid profile image.");
   }
 
   await getPrismaClient().professional.update({
     where: { id: professionalId },
-    data: { logoUrl },
+    data: { logoUrl: uploadedImage.secure_url },
   });
 
   revalidatePath("/dashboard/conta");

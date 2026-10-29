@@ -47,11 +47,18 @@ export async function syncCheckoutPayment({
     return false;
   }
 
+  const plan = subscriptionPlans[planType];
+  if (
+    amount === undefined ||
+    Math.round(amount * 100) !== Math.round(plan.amount * 100) ||
+    currency !== "BRL"
+  ) {
+    return false;
+  }
   if (status === "approved" && !paidAt) {
     throw new Error("Approved Mercado Pago payment requires a paid date.");
   }
 
-  const plan = subscriptionPlans[planType];
   const prisma = getPrismaClient();
 
   try {
@@ -59,7 +66,7 @@ export async function syncCheckoutPayment({
       async (transaction) => {
         const existing = await transaction.subscriptionPayment.findUnique({
           where: { mercadoPagoPaymentId: paymentId },
-          select: { appliedAt: true },
+          select: { appliedAt: true, status: true },
         });
         const paymentData = {
           professionalId,
@@ -86,6 +93,21 @@ export async function syncCheckoutPayment({
               ...paymentData,
             },
           });
+        }
+
+        const isRevokedPayment =
+          (status === "refunded" || status === "charged_back") &&
+          existing?.status === "approved" &&
+          existing.appliedAt !== null;
+        if (isRevokedPayment) {
+          await transaction.professional.updateMany({
+            where: { id: professionalId },
+            data: {
+              subscriptionStatus: "EXPIRED",
+              expiresAt: new Date(),
+            },
+          });
+          return;
         }
 
         if (status !== "approved" || existing?.appliedAt || !paidAt) {

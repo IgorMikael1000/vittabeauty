@@ -8,6 +8,7 @@ import {
 } from "@/generated/prisma/client";
 import { revalidatePath } from "next/cache";
 import { getAuthenticatedProfessionalId } from "@/lib/authenticated-professional";
+import { getDayBounds } from "@/lib/public-booking";
 import {
   getDateInTimezone,
   getWeekdayInTimezone,
@@ -63,6 +64,11 @@ async function ensureSlotIsAvailable(
     return "O atendimento deve terminar no mesmo dia em que começa.";
   }
 
+  const dayBounds = getDayBounds(startDate, timeZone);
+  if (!dayBounds) {
+    return "A data do atendimento não é válida.";
+  }
+
   const workingHours = await transaction.workingHours.findUnique({
     where: { professionalId_weekday: { professionalId, weekday } },
   });
@@ -83,7 +89,7 @@ async function ensureSlotIsAvailable(
       where: {
         professionalId,
         status: { in: activeAppointmentStatuses },
-        startsAt: { lt: endsAt },
+        startsAt: { gte: dayBounds.start, lt: endsAt },
         endsAt: { gt: startsAt },
       },
       select: { id: true },
@@ -237,6 +243,116 @@ export async function createAppointmentAction(
   revalidatePath("/dashboard/calendar");
   revalidatePath("/dashboard/clients");
   return { success: "Atendimento agendado." };
+}
+
+export async function createCalendarBlockAction(
+  _previousState: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const professionalId = await getAuthenticatedProfessionalId();
+  const startInput = formData.get("startsAt");
+  const endInput = formData.get("endsAt");
+  const rawReason = formData.get("reason");
+
+  if (
+    typeof startInput !== "string" ||
+    typeof endInput !== "string" ||
+    (rawReason !== null && typeof rawReason !== "string")
+  ) {
+    return { error: "Informe um período de bloqueio válido." };
+  }
+
+  const reason = typeof rawReason === "string" ? rawReason.trim() || null : null;
+  if ((reason?.length ?? 0) > 120) {
+    return { error: "O motivo deve ter no máximo 120 caracteres." };
+  }
+
+  const prisma = getPrismaClient();
+  const professional = await prisma.professional.findUnique({
+    where: { id: professionalId },
+    select: { timezone: true },
+  });
+  if (!professional) {
+    return { error: "Profissional não encontrado." };
+  }
+
+  const startsAt = parseDateTimeInTimezone(startInput, professional.timezone);
+  const endsAt = parseDateTimeInTimezone(endInput, professional.timezone);
+  if (!startsAt || !endsAt || startsAt <= new Date() || endsAt <= startsAt) {
+    return { error: "Informe início e fim futuros válidos para o bloqueio." };
+  }
+  if (
+    getDateInTimezone(startsAt, professional.timezone) !==
+    getDateInTimezone(endsAt, professional.timezone)
+  ) {
+    return { error: "O bloqueio deve começar e terminar no mesmo dia." };
+  }
+
+  try {
+    await prisma.$transaction(
+      async (transaction) => {
+        const [appointmentConflict, blockConflict] = await Promise.all([
+          transaction.appointment.findFirst({
+            where: {
+              professionalId,
+              status: { in: activeAppointmentStatuses },
+              startsAt: { lt: endsAt },
+              endsAt: { gt: startsAt },
+            },
+            select: { id: true },
+          }),
+          transaction.calendarBlock.findFirst({
+            where: {
+              professionalId,
+              startsAt: { lt: endsAt },
+              endsAt: { gt: startsAt },
+            },
+            select: { id: true },
+          }),
+        ]);
+
+        if (appointmentConflict) {
+          throw new SlotValidationError(
+            "Este período conflita com um atendimento existente.",
+          );
+        }
+        if (blockConflict) {
+          throw new SlotValidationError(
+            "Este período já está total ou parcialmente bloqueado.",
+          );
+        }
+
+        await transaction.calendarBlock.create({
+          data: {
+            professionalId,
+            startsAt,
+            endsAt,
+            reason,
+          },
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  } catch (error) {
+    if (error instanceof SlotValidationError) {
+      return { error: error.message };
+    }
+
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2034"
+    ) {
+      return {
+        error:
+          "A agenda foi alterada por outra operação. Atualize e tente novamente.",
+      };
+    }
+
+    throw error;
+  }
+
+  revalidatePath("/dashboard/calendar");
+  return { success: "Bloqueio adicionado à agenda." };
 }
 
 export async function deleteCalendarBlockAction(

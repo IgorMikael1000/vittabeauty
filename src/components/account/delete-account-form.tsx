@@ -36,7 +36,7 @@ function getAccessExpiryMessage(status: string, expiresAt: Date): string {
   if (status === "CANCELED" || status === "CANCELLED") {
     return `Seu acesso atual permanece disponível até ${date}.`;
   }
-  return `Sua assinatura dá acesso à plataforma até ${date}.`;
+  return `Seu plano dá acesso à plataforma até ${date}.`;
 }
 
 function getPlanLabel(planType: string): string {
@@ -61,6 +61,7 @@ export function DeleteAccountForm({
   const [cpf, setCpf] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [pendingDeletionToken, setPendingDeletionToken] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [step, setStep] = useState<"explanation" | "confirmation">(
     "explanation",
@@ -76,7 +77,9 @@ export function DeleteAccountForm({
     user &&
       email.trim() &&
       cpf.trim() &&
-      (hasGoogleProvider || (hasPasswordProvider && password)),
+      (pendingDeletionToken ||
+        hasGoogleProvider ||
+        (hasPasswordProvider && password)),
   );
   const accessExpiryMessage = getAccessExpiryMessage(
     subscriptionStatus,
@@ -110,36 +113,41 @@ export function DeleteAccountForm({
           return;
         }
 
-        if (hasGoogleProvider) {
-          await reauthenticateWithPopup(currentUser, googleProvider);
-        } else if (hasPasswordProvider && currentUser.email) {
-          await reauthenticateWithCredential(
-            currentUser,
-            EmailAuthProvider.credential(currentUser.email, password),
-          );
-        } else {
-          setError(
-            "Não foi possível confirmar sua identidade com o método de acesso desta conta.",
-          );
-          return;
+        let idToken = pendingDeletionToken;
+        if (!idToken) {
+          if (hasGoogleProvider) {
+            await reauthenticateWithPopup(currentUser, googleProvider);
+          } else if (hasPasswordProvider && currentUser.email) {
+            await reauthenticateWithCredential(
+              currentUser,
+              EmailAuthProvider.credential(currentUser.email, password),
+            );
+          } else {
+            setError(
+              "Não foi possível confirmar sua identidade com o método de acesso desta conta.",
+            );
+            return;
+          }
+          idToken = await currentUser.getIdToken(true);
         }
 
         const result = await deleteProfessionalAccountAction(
           email,
           cpf,
-          await currentUser.getIdToken(true),
+          idToken,
         );
         if (result.error) {
           if (result.cleanupPending) {
-            await signOut(auth);
-            router.replace("/login?accountDeletionPending=1");
-            router.refresh();
+            setPendingDeletionToken(idToken);
+            setError(result.error);
             return;
           }
+          setPendingDeletionToken("");
           setError(result.error);
           return;
         }
 
+        setPendingDeletionToken("");
         await signOut(auth).catch((signOutError: unknown) => {
           console.error(
             "Could not clear Firebase client state after account deletion.",
@@ -235,7 +243,7 @@ export function DeleteAccountForm({
                     A exclusão removerá permanentemente seu perfil e todos os
                     dados vinculados, incluindo clientes, serviços, agenda,
                     atendimentos, configurações e informações da plataforma.
-                    Uma assinatura ativa será cancelada antes da exclusão.
+                    O acesso à plataforma será encerrado com a exclusão da conta.
                   </p>
                   <div className="rounded-2xl border border-vitta-border bg-vitta-background/70 p-4">
                     <p className="font-semibold text-vitta-text">
@@ -313,7 +321,12 @@ export function DeleteAccountForm({
                   />
                 </label>
 
-                {user && hasGoogleProvider ? (
+                {pendingDeletionToken ? (
+                  <p className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
+                    A solicitação já foi iniciada. Tente concluí-la novamente
+                    sem fechar esta página.
+                  </p>
+                ) : user && hasGoogleProvider ? (
                   <p className="rounded-2xl border border-vitta-border bg-vitta-background/70 p-4 text-sm leading-6 text-vitta-muted">
                     Esta conta usa o Google para entrar. Ao continuar, será
                     solicitada uma nova confirmação da sua conta Google.
@@ -356,7 +369,11 @@ export function DeleteAccountForm({
                     disabled={pending || !canSubmit}
                     type="submit"
                   >
-                    {pending ? "Excluindo conta..." : "Confirmar exclusão"}
+                    {pending
+                      ? "Excluindo conta..."
+                      : pendingDeletionToken
+                        ? "Tentar concluir exclusão"
+                        : "Confirmar exclusão"}
                   </button>
                 </div>
               </form>

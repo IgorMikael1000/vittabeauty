@@ -13,40 +13,6 @@ type SubscriptionCheckoutState = {
   initUrl?: string;
 };
 
-function serializeErrorDetails(error: unknown): string {
-  const seen = new WeakSet<object>();
-
-  return (
-    JSON.stringify(
-      { error },
-      (_key, value: unknown) => {
-        if (typeof value === "bigint") {
-          return value.toString();
-        }
-
-        if (typeof value === "object" && value !== null) {
-          if (seen.has(value)) {
-            return "[Circular]";
-          }
-          seen.add(value);
-
-          if (value instanceof Error) {
-            return Object.fromEntries(
-              Object.getOwnPropertyNames(value).map((property) => [
-                property,
-                Reflect.get(value, property),
-              ]),
-            );
-          }
-        }
-
-        return value;
-      },
-      2,
-    ) ?? String(error)
-  );
-}
-
 function getApplicationUrl(): string {
   const configuredUrl =
     process.env.NEXT_PUBLIC_APP_URL ??
@@ -56,12 +22,12 @@ function getApplicationUrl(): string {
       : null);
 
   if (!configuredUrl) {
-    throw new Error("NEXT_PUBLIC_APP_URL is required for subscription checkout.");
+    throw new Error("NEXT_PUBLIC_APP_URL is required for payment checkout.");
   }
 
   const url = new URL(configuredUrl);
   if (url.protocol !== "https:" && process.env.NODE_ENV !== "development") {
-    throw new Error("Subscription checkout requires an HTTPS application URL.");
+    throw new Error("Payment checkout requires an HTTPS application URL.");
   }
 
   return url.origin;
@@ -105,6 +71,10 @@ export async function createSubscriptionCheckoutAction(
     const preference = new Preference(
       new MercadoPagoConfig({ accessToken }),
     );
+    const checkoutUrl = new URL(
+      "/dashboard/conta/assinatura",
+      applicationUrl,
+    );
     const body = {
       items: [
         {
@@ -117,18 +87,23 @@ export async function createSubscriptionCheckoutAction(
       ],
       payer: { email: professional.email },
       back_urls: {
-        success:
-          "https://vittabeauty.vercel.app/dashboard/conta/assinatura?status=success",
-        failure:
-          "https://vittabeauty.vercel.app/dashboard/conta/assinatura?status=failure",
-        pending:
-          "https://vittabeauty.vercel.app/dashboard/conta/assinatura?status=pending",
+        success: new URL(
+          `${checkoutUrl.pathname}?status=success`,
+          applicationUrl,
+        ).toString(),
+        failure: new URL(
+          `${checkoutUrl.pathname}?status=failure`,
+          applicationUrl,
+        ).toString(),
+        pending: new URL(
+          `${checkoutUrl.pathname}?status=pending`,
+          applicationUrl,
+        ).toString(),
       },
       auto_return: "approved",
       external_reference: `${professionalId}:${planTypeValue}`,
       notification_url: `${applicationUrl}/api/webhooks/mercadopago`,
     } satisfies Parameters<Preference["create"]>[0]["body"];
-    console.log("Payload enviado ao MP:", JSON.stringify(body, null, 2));
     const checkoutPreference = await preference.create({
       body,
     });
@@ -139,17 +114,18 @@ export async function createSubscriptionCheckoutAction(
       throw new Error("Mercado Pago did not return checkout details.");
     }
 
+    console.info("[Mercado Pago] One-time checkout preference created.", {
+      correlationId: checkoutPreference.id ?? crypto.randomUUID(),
+      status: "created",
+    });
     return { initUrl };
   } catch (error) {
-    console.error(
-      "[Mercado Pago] Falha detalhada ao criar assinatura:",
-      serializeErrorDetails(error),
-    );
+    console.error("[Mercado Pago] One-time checkout creation failed.", {
+      correlationId: crypto.randomUUID(),
+      code: error instanceof Error ? error.name : "UNKNOWN_ERROR",
+    });
     return {
-      error:
-        error instanceof Error && error.message.trim()
-          ? error.message
-          : "Não foi possível iniciar o checkout. Tente novamente em instantes.",
+      error: "Não foi possível iniciar o pagamento. Tente novamente em instantes.",
     };
   }
 }

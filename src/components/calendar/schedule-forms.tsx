@@ -1,7 +1,10 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { createAppointmentAction } from "@/app/actions/calendar";
+import {
+  createAppointmentAction,
+  createCalendarBlockAction,
+} from "@/app/actions/calendar";
 import type { FormState } from "@/app/actions/auth";
 import { ClientAutocomplete } from "@/components/calendar/client-autocomplete";
 import { FormFeedback } from "@/components/forms/form-feedback";
@@ -10,12 +13,17 @@ const initialState: FormState = {};
 
 type ScheduleFormsProps = {
   services: Array<{ id: string; name: string; durationMinutes: number }>;
+  timeZone: string;
 };
 
-export function ScheduleForms({ services }: ScheduleFormsProps) {
+export function ScheduleForms({ services, timeZone }: ScheduleFormsProps) {
   const [hasSelectedClient, setHasSelectedClient] = useState(false);
   const [appointmentState, appointmentAction, appointmentPending] =
     useActionState(createAppointmentAction, initialState);
+  const [blockState, blockAction, blockPending] = useActionState(
+    createCalendarBlockAction,
+    initialState,
+  );
 
   return (
     <div className="space-y-5">
@@ -83,6 +91,59 @@ export function ScheduleForms({ services }: ScheduleFormsProps) {
         </form>
       </details>
 
+      <details className="rounded-2xl border border-vitta-border bg-white shadow-card">
+        <summary className="cursor-pointer list-none p-5 sm:p-6">
+          <span className="block font-semibold text-vitta-text">
+            Bloquear horário pontual
+          </span>
+          <span className="mt-1 block text-sm text-vitta-muted">
+            Indisponibilize um período em uma data específica.
+          </span>
+        </summary>
+        <form
+          action={blockAction}
+          className="space-y-4 border-t border-vitta-border p-5 sm:p-6"
+        >
+          <p className="text-xs text-vitta-muted">
+            Os horários são interpretados no fuso {timeZone}.
+          </p>
+          <label className="block text-sm font-medium text-vitta-text">
+            Início
+            <input
+              className="mt-1.5 w-full rounded-xl border border-vitta-border px-3 py-2.5 outline-none focus:border-vitta focus:ring-2 focus:ring-vitta/15"
+              name="startsAt"
+              required
+              type="datetime-local"
+            />
+          </label>
+          <label className="block text-sm font-medium text-vitta-text">
+            Fim
+            <input
+              className="mt-1.5 w-full rounded-xl border border-vitta-border px-3 py-2.5 outline-none focus:border-vitta focus:ring-2 focus:ring-vitta/15"
+              name="endsAt"
+              required
+              type="datetime-local"
+            />
+          </label>
+          <label className="block text-sm font-medium text-vitta-text">
+            Motivo (opcional)
+            <input
+              className="mt-1.5 w-full rounded-xl border border-vitta-border px-3 py-2.5 outline-none focus:border-vitta focus:ring-2 focus:ring-vitta/15"
+              maxLength={120}
+              name="reason"
+              type="text"
+            />
+          </label>
+          <FormFeedback state={blockState} />
+          <button
+            className="rounded-xl border border-vitta-pink bg-vitta-pink/15 px-4 py-2.5 text-sm font-semibold text-vitta-text transition hover:bg-vitta-pink/25 disabled:opacity-60"
+            disabled={blockPending}
+            type="submit"
+          >
+            {blockPending ? "Salvando..." : "Bloquear horário"}
+          </button>
+        </form>
+      </details>
     </div>
   );
 }

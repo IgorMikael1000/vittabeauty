@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getAuthenticatedProfessionalId } from "@/lib/authenticated-professional";
+import { sumScheduledMaterialCosts } from "@/lib/financial-aggregates";
 import { getPrismaClient } from "@/lib/prisma";
 import { getReportPeriod } from "@/lib/report-period";
-import { sumMoneyCents } from "@/lib/money";
+import { decimalToCents } from "@/lib/money";
 
 export const metadata: Metadata = {
   title: "Relatórios",
@@ -35,122 +36,128 @@ export default async function ReportsPage({
   const period = getReportPeriod(query.from, query.to, professional.timezone);
   const now = new Date();
   const forecastFrom = period.from > now ? period.from : now;
-  const [incomeReceived, incomeExpected, expensesPaid, expensesExpected, appointments] =
-    await Promise.all([
-      prisma.transaction.findMany({
-        where: {
-          professionalId,
-          type: "INCOME",
-          status: "PAID",
-          paidAt: { gte: period.from, lt: period.to },
-        },
-        select: { amount: true },
-      }),
-      prisma.transaction.findMany({
-        where: {
-          professionalId,
-          type: "INCOME",
-          status: "PENDING",
-          appointmentId: null,
-          OR: [
-            { dueAt: { gte: period.from, lt: period.to } },
-            {
-              dueAt: null,
-              createdAt: { gte: period.from, lt: period.to },
-            },
-          ],
-        },
-        select: { amount: true },
-      }),
-      prisma.transaction.findMany({
-        where: {
-          professionalId,
-          type: "EXPENSE",
-          status: "PAID",
-          paidAt: { gte: period.from, lt: period.to },
-        },
-        select: { amount: true },
-      }),
-      prisma.transaction.findMany({
-        where: {
-          professionalId,
-          type: "EXPENSE",
-          status: "PENDING",
-          appointmentId: null,
-          OR: [
-            { dueAt: { gte: period.from, lt: period.to } },
-            {
-              dueAt: null,
-              createdAt: { gte: period.from, lt: period.to },
-            },
-          ],
-        },
-        select: { amount: true },
-      }),
-      prisma.appointment.findMany({
-        where: {
-          professionalId,
-          startsAt: { gte: period.from, lt: period.to },
-        },
-        select: {
-          status: true,
-          startsAt: true,
-          priceAtBooking: true,
-          service: {
-            select: { id: true, name: true, materialCost: true },
+  const [
+    incomeReceived,
+    incomeExpected,
+    expensesPaid,
+    expensesExpected,
+    appointmentGroups,
+    futureAppointments,
+    futureServiceCostCents,
+  ] = await Promise.all([
+    prisma.transaction.aggregate({
+      where: {
+        professionalId,
+        type: "INCOME",
+        status: "PAID",
+        paidAt: { gte: period.from, lt: period.to },
+      },
+      _sum: { amount: true },
+    }),
+    prisma.transaction.aggregate({
+      where: {
+        professionalId,
+        type: "INCOME",
+        status: "PENDING",
+        appointmentId: null,
+        OR: [
+          { dueAt: { gte: period.from, lt: period.to } },
+          {
+            dueAt: null,
+            createdAt: { gte: period.from, lt: period.to },
           },
-        },
-      }),
-    ]);
-
-  const completedByService = new Map<
-    string,
-    { id: string; name: string; count: number }
-  >();
-  for (const appointment of appointments) {
-    if (appointment.status !== "COMPLETED") {
-      continue;
-    }
-
-    const current = completedByService.get(appointment.service.id);
-    completedByService.set(appointment.service.id, {
-      id: appointment.service.id,
-      name: appointment.service.name,
-      count: (current?.count ?? 0) + 1,
-    });
-  }
-
-  const topServices = [...completedByService.values()]
-    .sort((left, right) => right.count - left.count)
-    .slice(0, 5);
-  const cancelledCount = appointments.filter(
-    (appointment) => appointment.status === "CANCELLED",
-  ).length;
-  const cancellationRate =
-    appointments.length > 0
-      ? (cancelledCount / appointments.length) * 100
-      : 0;
-  const incomeReceivedCents = sumMoneyCents(incomeReceived);
-  const futureAppointments = appointments.filter(
-    (appointment) =>
-      (appointment.status === "PENDING" ||
-        appointment.status === "CONFIRMED") &&
-      appointment.startsAt >= forecastFrom,
-  );
-  const incomeExpectedCents = sumMoneyCents([
-    ...incomeExpected,
-    ...futureAppointments.map((appointment) => ({
-      amount: appointment.priceAtBooking,
-    })),
+        ],
+      },
+      _sum: { amount: true },
+    }),
+    prisma.transaction.aggregate({
+      where: {
+        professionalId,
+        type: "EXPENSE",
+        status: "PAID",
+        paidAt: { gte: period.from, lt: period.to },
+      },
+      _sum: { amount: true },
+    }),
+    prisma.transaction.aggregate({
+      where: {
+        professionalId,
+        type: "EXPENSE",
+        status: "PENDING",
+        appointmentId: null,
+        OR: [
+          { dueAt: { gte: period.from, lt: period.to } },
+          {
+            dueAt: null,
+            createdAt: { gte: period.from, lt: period.to },
+          },
+        ],
+      },
+      _sum: { amount: true },
+    }),
+    prisma.appointment.groupBy({
+      by: ["serviceId", "status"],
+      where: {
+        professionalId,
+        startsAt: { gte: period.from, lt: period.to },
+      },
+      _count: { _all: true },
+    }),
+    prisma.appointment.aggregate({
+      where: {
+        professionalId,
+        status: { in: ["PENDING", "CONFIRMED"] },
+        startsAt: { gte: forecastFrom, lt: period.to },
+      },
+      _sum: { priceAtBooking: true },
+    }),
+    sumScheduledMaterialCosts(professionalId, forecastFrom, period.to),
   ]);
-  const expensesPaidCents = sumMoneyCents(expensesPaid);
+
+  const appointmentCount = appointmentGroups.reduce(
+    (total, group) => total + group._count._all,
+    0,
+  );
+  const cancelledCount = appointmentGroups.reduce(
+    (total, group) =>
+      group.status === "CANCELLED" ? total + group._count._all : total,
+    0,
+  );
+  const topServiceCounts = appointmentGroups
+    .filter((group) => group.status === "COMPLETED")
+    .sort((left, right) => right._count._all - left._count._all)
+    .slice(0, 5);
+  const topServiceDetails = topServiceCounts.length
+    ? await prisma.service.findMany({
+        where: {
+          professionalId,
+          id: { in: topServiceCounts.map((group) => group.serviceId) },
+        },
+        select: { id: true, name: true },
+      })
+    : [];
+  const serviceNames = new Map(
+    topServiceDetails.map((service) => [service.id, service.name]),
+  );
+  const topServices = topServiceCounts.map((group) => ({
+    id: group.serviceId,
+    name: serviceNames.get(group.serviceId) ?? "Serviço removido",
+    count: group._count._all,
+  }));
+  const cancellationRate =
+    appointmentCount > 0
+      ? (cancelledCount / appointmentCount) * 100
+      : 0;
+  const incomeReceivedCents = decimalToCents(
+    incomeReceived._sum.amount ?? "0",
+  );
+  const incomeExpectedCents =
+    decimalToCents(incomeExpected._sum.amount ?? "0") +
+    decimalToCents(futureAppointments._sum.priceAtBooking ?? "0");
+  const expensesPaidCents = decimalToCents(expensesPaid._sum.amount ?? "0");
   const expensesExpectedCents =
-    sumMoneyCents(expensesExpected) +
-    sumMoneyCents(
-      futureAppointments.map((appointment) => ({
-        amount: appointment.service.materialCost,
-      })),
-    );
+    decimalToCents(expensesExpected._sum.amount ?? "0") +
+    futureServiceCostCents;
   const periodLabel = `${period.fromDate} – ${period.toDate}`;
   const cards = [
     {
@@ -254,7 +261,7 @@ export default async function ReportsPage({
             Atendimentos agendados
           </p>
           <p className="mt-2 text-3xl font-semibold text-vitta-text">
-            {appointments.length}
+            {appointmentCount}
           </p>
           <p className="mt-2 text-xs text-vitta-muted">
             No período selecionado
@@ -271,7 +278,7 @@ export default async function ReportsPage({
             %
           </p>
           <p className="mt-2 text-xs text-vitta-muted">
-            {cancelledCount} de {appointments.length} atendimentos
+            {cancelledCount} de {appointmentCount} atendimentos
           </p>
         </article>
         <article className="rounded-2xl border border-vitta-border bg-white p-5 shadow-card">

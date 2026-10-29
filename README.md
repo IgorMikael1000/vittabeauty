@@ -33,16 +33,14 @@ I&T Solutions com Next.js, TypeScript, Tailwind CSS, Prisma e PostgreSQL na Neon
    E-mail/senha e Google e configure os domínios autorizados para desenvolvimento
    e produção.
 
-4. Crie as tabelas no banco:
+4. Crie as tabelas no banco vazio usando a migration versionada:
 
    ```powershell
-   npm run db:push
-   npm run db:indexes:client-search
+   npm run db:migrate:deploy
    ```
 
-   O segundo comando cria índices de expressão usados pela busca de clientes
-   na agenda e pelo vínculo de clientes em agendamentos públicos. Execute-o
-   também uma vez no banco de produção após sincronizar o schema.
+   Essa migration cria o schema atual e os índices de expressão usados pela
+   busca de clientes.
 
 5. Inicie o servidor de desenvolvimento:
 
@@ -58,13 +56,38 @@ I&T Solutions com Next.js, TypeScript, Tailwind CSS, Prisma e PostgreSQL na Neon
 - `npm run build`: gera o Prisma Client e cria o build de produção.
 - `npm run lint`: executa o ESLint.
 - `npm run db:generate`: gera o cliente Prisma a partir do schema.
-- `npm run db:push`: sincroniza o schema com o banco configurado.
-- `npm run db:migrate`: cria e aplica uma migration de desenvolvimento.
+- `npm run db:migrate`: cria e aplica migrations em desenvolvimento.
+- `npm run db:migrate:deploy`: aplica migrations pendentes em um banco
+  configurado.
+- `npm run db:migrate:status`: exibe o estado das migrations no banco.
+- `npm run db:push`: uso somente local em banco descartável; não usar em
+  produção.
 
-O schema atual adiciona CPF, telefone e especialidade para profissionais e
-remove a data de nascimento de clientes. Antes de sincronizar um banco que já
-tenha dados, faça backup: o `db:push` pode remover a coluna de aniversário e
-apagar os valores existentes nela.
+Para um banco existente sem histórico de migrations, **não aplique a migration
+inicial diretamente**: ela cria todas as tabelas. Faça backup e compare o schema
+real com a migration. Depois de confirmar que tabelas, constraints e índices
+correspondem, registre o baseline com
+`npx prisma migrate resolve --applied 20261028233000_initial` e valide com
+`npm run db:migrate:status`. Se houver divergência, reconcilie-a em uma etapa
+planejada antes de registrar o baseline; não use `migrate resolve` para ocultar
+diferenças.
+
+Para produção, aplique as migrations pendentes com `npm run db:migrate:deploy`
+antes de disponibilizar a versão correspondente.
+
+### Cloudinary para fotos de perfil
+
+As fotos de perfil são enviadas pelo servidor ao Cloudinary, e o PostgreSQL
+guarda somente a URL segura da imagem. Configure `CLOUDINARY_CLOUD_NAME`,
+`CLOUDINARY_API_KEY` e `CLOUDINARY_API_SECRET` no ambiente local e na Vercel.
+O nome da nuvem é a parte após `@` na URL exibida pela Cloudinary
+(`cloudinary://<api_key>:<api_secret>@<cloud_name>`). A chave e o segredo são
+server-only; nunca use o segredo em variáveis `NEXT_PUBLIC_*`.
+Os uploads são WebP, limitados a 50 KB e usam um identificador por profissional.
+
+Fotos antigas que já estejam salvas como Data URL no banco continuam sendo
+exibidas por compatibilidade; elas devem ser migradas/recarregadas antes de
+remover o suporte legado.
 
 ## Fundação e segurança
 
@@ -89,8 +112,9 @@ apagar os valores existentes nela.
   A chave PIX é configurada pelo profissional; a desativação é reversível e
   preserva o histórico.
 - Agenda: visualização diária, semanal e mensal; criação manual de
-  atendimentos, cancelamento e conclusão; bloqueios de horários; e configuração
-  de expediente por dia da semana.
+  atendimentos, cancelamento e conclusão; criação e remoção de bloqueios
+  pontuais por data; e configuração de expediente e pausas recorrentes por dia
+  da semana.
 - Horários e datas são interpretados usando o fuso horário do profissional.
   Atendimentos exigem cliente, serviço ativo, expediente configurado e um
   período sem conflito com outros atendimentos ou bloqueios.
@@ -169,19 +193,28 @@ apagar os valores existentes nela.
   `/auth/action` apenas encaminha links antigos ao handler padrão do domínio
   Firebase. Após confirmar uma troca de e-mail, o retorno ao dashboard
   sincroniza o endereço no perfil profissional.
-- Configure também limites de requisição no provedor de borda para login,
-  cadastro e envio de solicitações públicas antes da exposição à internet.
+- Login, cadastro e agendamento público usam rate limiting distribuído via
+  Upstash Redis. Configure `UPSTASH_REDIS_REST_URL` e
+  `UPSTASH_REDIS_REST_TOKEN` no servidor antes da exposição à internet; sem
+  essas credenciais ou sem acesso ao Redis, as ações são recusadas.
+- A exclusão da conta marca primeiro o perfil com `deletionPendingAt`, bloqueia
+  o acesso autenticado e desativa o agendamento público antes de remover o
+  usuário do Firebase e apagar os dados relacionais em uma transação. Se uma
+  etapa falhar, a solicitação permanece pendente e pode ser tentada novamente
+  na tela atual; se a sessão for encerrada antes da conclusão, o suporte deve
+  finalizar a solicitação.
 - O trial profissional dura três dias a partir do cadastro. Após o vencimento,
   o dashboard exige a escolha de um plano; o link público de agendamento fica
-  indisponível até a assinatura ser ativada.
-- As assinaturas recorrentes usam o SDK oficial do Mercado Pago. Configure
-  `MERCADOPAGO_ACCESS_TOKEN` e `MERCADOPAGO_WEBHOOK_SECRET` no ambiente de
-  execução. O checkout envia notificações para
-  `/api/webhooks/mercadopago`; habilite os eventos
-  `subscription_preapproval` e `subscription_authorized_payment`.
-- Os pagamentos são deduplicados pelo ID da fatura do Mercado Pago. A validação
-  HMAC do webhook exige os cabeçalhos assinados e rejeita notificações com mais
-  de cinco minutos.
+  indisponível até que um pagamento de plano seja confirmado.
+- Os planos são vendidos exclusivamente por pagamento único no Checkout Pro do
+  Mercado Pago; a renovação é manual e não há cobrança recorrente automática.
+  Configure `MERCADOPAGO_ACCESS_TOKEN` e `MERCADOPAGO_WEBHOOK_SECRET` no
+  ambiente de execução. O checkout envia notificações para
+  `/api/webhooks/mercadopago`; habilite os eventos `payment`.
+- Os pagamentos são deduplicados pelo ID do pagamento do Mercado Pago e o
+  webhook valida o HMAC, exige os cabeçalhos assinados e rejeita notificações
+  com mais de cinco minutos. Reembolsos e contestações de pagamentos aplicados
+  revogam o acesso.
 
 ## Deploy na Vercel
 
@@ -198,16 +231,20 @@ variáveis no projeto antes do primeiro deploy:
   `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`,
   `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` e `NEXT_PUBLIC_FIREBASE_APP_ID`:
   configuração pública do app Web Firebase usado pelo Authentication.
+- `CLOUDINARY_CLOUD_NAME` e `CLOUDINARY_API_KEY`: configuração do Cloudinary.
+- `CLOUDINARY_API_SECRET`: segredo server-only do Cloudinary.
 - `MERCADOPAGO_ACCESS_TOKEN`: token de acesso de produção do Mercado Pago.
 - `MERCADOPAGO_WEBHOOK_SECRET`: segredo de assinatura dos webhooks do Mercado
   Pago.
+- `UPSTASH_REDIS_REST_URL` e `UPSTASH_REDIS_REST_TOKEN`: credenciais server-only
+  do Upstash Redis para rate limiting distribuído.
 
 O build executa `prisma generate && next build`. Alterações ao schema do banco
-devem ser aplicadas explicitamente com `npm run db:push` ou migrations antes
-de disponibilizar a versão correspondente.
+devem ser aplicadas explicitamente com migrations antes de disponibilizar a
+versão correspondente.
 
 Antes de hospedar, rotacione qualquer senha de banco que tenha sido
-compartilhada fora do cofre de segredos do ambiente de deploy e configure
-limites de requisição no provedor de borda para login, cadastro e agendamento
-público. O teste ponta a ponta com dados reais exige um ambiente Neon e
-credenciais de teste específicos; nenhuma seed ou conta demonstrativa é criada.
+compartilhada fora do cofre de segredos do ambiente de deploy e configure as
+credenciais Upstash exigidas para login, cadastro e agendamento público. O
+teste ponta a ponta com dados reais exige um ambiente Neon e credenciais de
+teste específicos; nenhuma seed ou conta demonstrativa é criada.

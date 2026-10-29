@@ -56,7 +56,7 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
-async function compressImage(file: File): Promise<string> {
+async function compressImage(file: File): Promise<Blob> {
   if (!file.type.startsWith("image/")) {
     throw new Error("Selecione um arquivo de imagem.");
   }
@@ -88,10 +88,7 @@ async function compressImage(file: File): Promise<string> {
 
   for (const quality of [0.7, 0.6, 0.5, 0.4]) {
     const blob = await canvasToWebp(canvas, quality);
-    const dataUrl = await blobToDataUrl(blob);
-    if (new TextEncoder().encode(dataUrl).byteLength <= maximumImageSize) {
-      return dataUrl;
-    }
+    if (blob.size <= maximumImageSize) return blob;
   }
 
   throw new Error(
@@ -129,8 +126,10 @@ export function ProfileImageUpload({
     setError(null);
     setSuccess(null);
     try {
-      const dataUrl = await compressImage(file);
-      const result = await updateProfileImageAction(dataUrl);
+      const image = await compressImage(file);
+      const result = await updateProfileImageAction(
+        await blobToDataUrl(image),
+      );
       if (result.error) {
         setError(result.error);
         return;

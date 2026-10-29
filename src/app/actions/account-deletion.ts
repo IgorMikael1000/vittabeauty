@@ -1,6 +1,6 @@
 "use server";
 
-import { MercadoPagoConfig, PreApproval } from "mercadopago";
+import { v2 as cloudinary } from "cloudinary";
 import { revalidatePath } from "next/cache";
 import { clearFirebaseSession, getFirebaseSession } from "@/lib/firebase-session";
 import { getCpfDigits } from "@/lib/professional-validation";
@@ -27,27 +27,6 @@ function getFirebaseErrorCode(value: unknown): string | null {
     return value.error.message.split(" ")[0].slice(0, 80);
   }
   return null;
-}
-
-async function cancelSubscription(subscriptionId: string): Promise<void> {
-  const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
-  if (!accessToken) {
-    throw new Error("MERCADOPAGO_ACCESS_TOKEN_NOT_CONFIGURED");
-  }
-
-  const client = new PreApproval(new MercadoPagoConfig({ accessToken }));
-  const subscription = await client.get({ id: subscriptionId });
-  if (subscription.status === "cancelled" || subscription.status === "canceled") {
-    return;
-  }
-
-  const updated = await client.update({
-    id: subscriptionId,
-    body: { status: "cancelled" },
-  });
-  if (updated.status !== "cancelled" && updated.status !== "canceled") {
-    throw new Error("MERCADO_PAGO_CANCELLATION_NOT_CONFIRMED");
-  }
 }
 
 async function deleteFirebaseUser(idToken: string): Promise<void> {
@@ -84,6 +63,45 @@ async function deleteFirebaseUser(idToken: string): Promise<void> {
   throw new Error("FIREBASE_ACCOUNT_DELETION_FAILED");
 }
 
+async function deleteCloudinaryProfileImage(
+  professionalId: string,
+  imageUrl: string | null,
+): Promise<void> {
+  if (!imageUrl) return;
+
+  let url: URL;
+  try {
+    url = new URL(imageUrl);
+  } catch {
+    return;
+  }
+  if (url.hostname !== "res.cloudinary.com") return;
+
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+  if (!cloudName || !apiKey || !apiSecret) {
+    throw new Error("CLOUDINARY_CREDENTIALS_NOT_CONFIGURED");
+  }
+  if (url.pathname.split("/")[1] !== cloudName) {
+    throw new Error("CLOUDINARY_PROFILE_IMAGE_CLOUD_MISMATCH");
+  }
+
+  cloudinary.config({
+    cloud_name: cloudName,
+    api_key: apiKey,
+    api_secret: apiSecret,
+    secure: true,
+  });
+  const result = await cloudinary.uploader.destroy(
+    `profile-images/${professionalId}`,
+    { resource_type: "image", invalidate: true },
+  );
+  if (result.result !== "ok" && result.result !== "not found") {
+    throw new Error("CLOUDINARY_PROFILE_IMAGE_DELETION_FAILED");
+  }
+}
+
 export async function deleteProfessionalAccountAction(
   emailInput: string,
   cpfInput: string,
@@ -118,17 +136,6 @@ export async function deleteProfessionalAccountAction(
     return { error: "Não foi possível confirmar sua identidade. Entre novamente." };
   }
 
-  const nowSeconds = Math.floor(Date.now() / 1000);
-  if (identity.authTime > nowSeconds + 30 || nowSeconds - identity.authTime > 5 * 60) {
-    logAuthEvent("account.deletion_rejected", {
-      outcome: "rejected",
-      code: "RECENT_LOGIN_REQUIRED",
-    });
-    return {
-      error: "Confirme sua identidade novamente para excluir a conta.",
-    };
-  }
-
   const prisma = getPrismaClient();
   const professional = await prisma.professional.findUnique({
     where: { firebaseUid: session.uid },
@@ -136,15 +143,32 @@ export async function deleteProfessionalAccountAction(
       id: true,
       email: true,
       cpf: true,
-      mpSubscriptionId: true,
+      deletionPendingAt: true,
+      logoUrl: true,
     },
   });
   if (!professional) {
+    logAuthEvent("account.deleted", {
+      outcome: "success",
+      code: "ALREADY_DELETED",
+    });
+    await clearFirebaseSession();
+    return { success: "Conta excluída." };
+  }
+
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  if (
+    !professional.deletionPendingAt &&
+    (identity.authTime > nowSeconds + 30 ||
+      nowSeconds - identity.authTime > 5 * 60)
+  ) {
     logAuthEvent("account.deletion_rejected", {
       outcome: "rejected",
-      code: "PROFILE_NOT_FOUND",
+      code: "RECENT_LOGIN_REQUIRED",
     });
-    return { error: "Não encontramos o perfil vinculado à sua sessão." };
+    return {
+      error: "Confirme sua identidade novamente para excluir a conta.",
+    };
   }
 
   if (!professional.cpf) {
@@ -169,20 +193,20 @@ export async function deleteProfessionalAccountAction(
     return { error: "O e-mail ou CPF informado não corresponde ao cadastro." };
   }
 
-  if (professional.mpSubscriptionId) {
+  if (!professional.deletionPendingAt) {
     try {
-      await cancelSubscription(professional.mpSubscriptionId);
-      logAuthEvent("account.deletion_subscription_cancelled", {
-        outcome: "success",
+      await prisma.professional.update({
+        where: { id: professional.id },
+        data: { deletionPendingAt: new Date() },
       });
     } catch (error) {
-      logAuthEvent("account.deletion_subscription_cancellation_failed", {
+      logAuthEvent("account.deletion_failed", {
         outcome: "failed",
         code: error instanceof Error ? error.name : "UNKNOWN_ERROR",
       });
       return {
         error:
-          "Não foi possível cancelar sua assinatura no Mercado Pago. Seus dados não foram excluídos; entre em contato com o suporte.",
+          "Não foi possível iniciar a exclusão com segurança. Seus dados continuam preservados.",
       };
     }
   }
@@ -190,21 +214,60 @@ export async function deleteProfessionalAccountAction(
   try {
     await deleteFirebaseUser(idToken);
   } catch (error) {
+    const errorCode = error instanceof Error ? error.message : "";
     const recentLoginRequired =
-      error instanceof Error &&
-      error.message === "FIREBASE_RECENT_LOGIN_REQUIRED";
+      errorCode === "FIREBASE_RECENT_LOGIN_REQUIRED";
+    if (recentLoginRequired) {
+      try {
+        await prisma.professional.updateMany({
+          where: {
+            id: professional.id,
+            deletionPendingAt: { not: null },
+          },
+          data: { deletionPendingAt: null },
+        });
+      } catch (rollbackError) {
+        logAuthEvent("account.deletion_pending_reset_failed", {
+          outcome: "failed",
+          code:
+            rollbackError instanceof Error
+              ? rollbackError.name
+              : "UNKNOWN_ERROR",
+        });
+        return {
+          error:
+            "A solicitação está pendente. Entre em contato com o suporte para concluir a exclusão.",
+          cleanupPending: true,
+        };
+      }
+    }
     logAuthEvent("account.deletion_failed", {
       outcome: "failed",
       code: recentLoginRequired
         ? "RECENT_LOGIN_REQUIRED"
-        : error instanceof Error
-          ? error.message.slice(0, 80)
+        : errorCode
+          ? errorCode.slice(0, 80)
           : "UNKNOWN_ERROR",
     });
     return {
       error: recentLoginRequired
         ? "Sua confirmação expirou. Confirme sua identidade novamente."
-        : "Não foi possível excluir a autenticação Firebase. Seus dados continuam preservados.",
+        : "A exclusão foi iniciada, mas ainda não pôde ser concluída. Tente novamente nesta tela.",
+      ...(recentLoginRequired ? {} : { cleanupPending: true }),
+    };
+  }
+
+  try {
+    await deleteCloudinaryProfileImage(professional.id, professional.logoUrl);
+  } catch (error) {
+    logAuthEvent("account.deletion_cloudinary_failed", {
+      outcome: "failed",
+      code: error instanceof Error ? error.message.slice(0, 80) : "UNKNOWN_ERROR",
+    });
+    return {
+      error:
+        "A exclusão está pendente porque não foi possível remover a foto de perfil. Tente novamente nesta tela.",
+      cleanupPending: true,
     };
   }
 
@@ -234,19 +297,18 @@ export async function deleteProfessionalAccountAction(
       await transaction.subscriptionPayment.deleteMany({
         where: { professionalId: professional.id },
       });
-      await transaction.professional.delete({
+      await transaction.professional.deleteMany({
         where: { id: professional.id },
       });
     });
   } catch (error) {
-    await clearFirebaseSession();
     logAuthEvent("account.deletion_database_failed", {
       outcome: "failed",
       code: error instanceof Error ? error.name : "UNKNOWN_ERROR",
     });
     return {
       error:
-        "A autenticação foi removida, mas não conseguimos concluir a exclusão dos dados. Entre em contato com o suporte para finalizar a solicitação.",
+        "A autenticação foi removida, mas a exclusão dos dados está pendente. Tente novamente nesta tela para concluir.",
       cleanupPending: true,
     };
   }

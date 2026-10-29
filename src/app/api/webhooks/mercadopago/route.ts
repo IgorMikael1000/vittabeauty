@@ -1,18 +1,12 @@
 import {
-  Invoice,
   MercadoPagoConfig,
   Payment,
-  PreApproval,
   WebhookSignatureValidator,
 } from "mercadopago";
-import { Prisma } from "@/generated/prisma/client";
 import { NextResponse, type NextRequest } from "next/server";
 import { getPrismaClient } from "@/lib/prisma";
 import { syncCheckoutPayment } from "@/lib/subscription-payments";
-import {
-  isSubscriptionPlanType,
-  subscriptionPlans,
-} from "@/lib/subscriptions";
+import { isSubscriptionPlanType } from "@/lib/subscriptions";
 
 export const runtime = "nodejs";
 
@@ -45,112 +39,6 @@ function getClient() {
   return new MercadoPagoConfig({ accessToken });
 }
 
-async function handlePreapproval(preapprovalId: string): Promise<void> {
-  const preapproval = await new PreApproval(getClient()).get({
-    id: preapprovalId,
-  });
-  const reference = getPlanReference(preapproval.external_reference);
-  if (
-    !reference ||
-    (preapproval.status !== "cancelled" && preapproval.status !== "canceled")
-  ) {
-    return;
-  }
-
-  await getPrismaClient().professional.updateMany({
-    where: {
-      id: reference.professionalId,
-      mpSubscriptionId: preapprovalId,
-    },
-    data: { subscriptionStatus: "CANCELED" },
-  });
-}
-
-async function handleAuthorizedPayment(paymentId: string): Promise<void> {
-  const invoice = await new Invoice(getClient()).get({ id: paymentId });
-  if (!invoice.preapproval_id) return;
-
-  const preapproval = await new PreApproval(getClient()).get({
-    id: invoice.preapproval_id,
-  });
-  const reference = getPlanReference(preapproval.external_reference);
-  if (!reference) return;
-
-  const paymentStatus = invoice.payment?.status;
-  const isPaid = paymentStatus === "approved" || invoice.status === "processed";
-  const isSubscriptionCancelled =
-    preapproval.status === "cancelled" || preapproval.status === "canceled";
-
-  if (!isPaid) {
-    const isRejected =
-      paymentStatus === "rejected" ||
-      invoice.status === "recycling" ||
-      invoice.status === "cancelled";
-    if (isRejected) {
-      await getPrismaClient().professional.updateMany({
-        where: {
-          id: reference.professionalId,
-          expiresAt: { lte: new Date() },
-        },
-        data: { subscriptionStatus: "EXPIRED" },
-      });
-    }
-    return;
-  }
-
-  const paidAtCandidate = new Date(
-    invoice.last_modified ?? invoice.date_created ?? Date.now(),
-  );
-  const paidAt = Number.isNaN(paidAtCandidate.getTime())
-    ? new Date()
-    : paidAtCandidate;
-  const plan = subscriptionPlans[reference.planType];
-
-  try {
-    await getPrismaClient().$transaction(async (transaction) => {
-      await transaction.subscriptionPayment.create({
-        data: {
-          mercadoPagoPaymentId: paymentId,
-          professionalId: reference.professionalId,
-          planType: reference.planType,
-          paidAt,
-          appliedAt: paidAt,
-        },
-      });
-
-      const professional = await transaction.professional.findUnique({
-        where: { id: reference.professionalId },
-        select: { expiresAt: true },
-      });
-      if (!professional) {
-        throw new Error("Subscription payment references an unknown account.");
-      }
-
-      const baseTime = Math.max(
-        professional.expiresAt.getTime(),
-        paidAt.getTime(),
-      );
-      await transaction.professional.update({
-        where: { id: reference.professionalId },
-        data: {
-          subscriptionStatus: isSubscriptionCancelled ? "CANCELED" : "ACTIVE",
-          planType: reference.planType,
-          mpSubscriptionId: invoice.preapproval_id,
-          expiresAt: new Date(baseTime + plan.durationDays * 24 * 60 * 60 * 1000),
-        },
-      });
-    });
-  } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
-      return;
-    }
-    throw error;
-  }
-}
-
 async function handlePreferencePayment(paymentId: string): Promise<void> {
   const payment = await new Payment(getClient()).get({ id: paymentId });
   const reference = getPlanReference(payment.external_reference);
@@ -161,7 +49,7 @@ async function handlePreferencePayment(paymentId: string): Promise<void> {
     paidAtValue && !Number.isNaN(new Date(paidAtValue).getTime())
       ? new Date(paidAtValue)
       : undefined;
-  await syncCheckoutPayment({
+  const paymentSynchronized = await syncCheckoutPayment({
     paymentId,
     externalReference: payment.external_reference,
     status: payment.status ?? "unknown",
@@ -174,7 +62,14 @@ async function handlePreferencePayment(paymentId: string): Promise<void> {
     paidAt,
   });
 
+  console.info("[Mercado Pago] One-time payment webhook processed.", {
+    correlationId: paymentId,
+    status: payment.status ?? "unknown",
+    synchronized: paymentSynchronized,
+  });
+
   if (
+    paymentSynchronized &&
     (payment.status === "rejected" || payment.status === "cancelled") &&
     payment.status_detail !== "pending_contingency" &&
     payment.status_detail !== "pending_review_manual"
@@ -255,14 +150,7 @@ export async function POST(request: NextRequest) {
         ? payload.action
         : url.searchParams.get("type") ?? url.searchParams.get("topic") ?? "";
 
-  if (
-    eventType.includes("subscription_preapproval") ||
-    eventType === "preapproval"
-  ) {
-    await handlePreapproval(dataId);
-  } else if (eventType.includes("authorized_payment")) {
-    await handleAuthorizedPayment(dataId);
-  } else if (eventType === "payment" || eventType.startsWith("payment.")) {
+  if (eventType === "payment" || eventType.startsWith("payment.")) {
     await handlePreferencePayment(dataId);
   }
 

@@ -9,6 +9,10 @@ import {
 } from "@/lib/verify-firebase-token";
 import { logAuthEvent } from "@/lib/auth-logger";
 import {
+  checkRequestRateLimit,
+  RequestRateLimitUnavailableError,
+} from "@/lib/request-rate-limit";
+import {
   clearFirebaseSession,
   createFirebaseSession,
 } from "@/lib/firebase-session";
@@ -67,6 +71,31 @@ export async function loginWithFirebaseAction(
   success?: boolean;
   error?: string;
 }> {
+  let rateLimit;
+  try {
+    rateLimit = await checkRequestRateLimit("login");
+  } catch (error) {
+    if (!(error instanceof RequestRateLimitUnavailableError)) throw error;
+    logAuthEvent("login.rate_limit_unavailable", {
+      outcome: "failed",
+      code: "RATE_LIMIT_UNAVAILABLE",
+    });
+    return {
+      error: "O acesso está temporariamente indisponível. Tente novamente.",
+    };
+  }
+  if (!rateLimit.allowed) {
+    logAuthEvent("login.rate_limited", {
+      outcome: "rejected",
+      code: "RATE_LIMITED",
+    });
+    return {
+      error: `Muitas tentativas de acesso. Aguarde ${Math.ceil(
+        rateLimit.retryAfterSeconds / 60,
+      )} min e tente novamente.`,
+    };
+  }
+
   logAuthEvent("login.started", { outcome: "started" });
   let tokenValidation;
   try {
@@ -213,6 +242,31 @@ export async function registerAction(
   _previousState: FormState,
   formData: FormData,
 ): Promise<FormState> {
+  let rateLimit;
+  try {
+    rateLimit = await checkRequestRateLimit("registration");
+  } catch (error) {
+    if (!(error instanceof RequestRateLimitUnavailableError)) throw error;
+    logAuthEvent("registration.rate_limit_unavailable", {
+      outcome: "failed",
+      code: "RATE_LIMIT_UNAVAILABLE",
+    });
+    return {
+      error: "O cadastro está temporariamente indisponível. Tente novamente.",
+    };
+  }
+  if (!rateLimit.allowed) {
+    logAuthEvent("registration.rate_limited", {
+      outcome: "rejected",
+      code: "RATE_LIMITED",
+    });
+    return {
+      error: `Muitas tentativas de cadastro. Aguarde ${Math.ceil(
+        rateLimit.retryAfterSeconds / 60,
+      )} min e tente novamente.`,
+    };
+  }
+
   logAuthEvent("registration.started", { outcome: "started" });
   const nameInput = formData.get("name");
   const emailInput = formData.get("email");
@@ -504,6 +558,18 @@ export async function verifyLegacyCredentialsAction(
   emailInput: string,
   password: string,
 ): Promise<boolean> {
+  try {
+    const rateLimit = await checkRequestRateLimit("login");
+    if (!rateLimit.allowed) return false;
+  } catch (error) {
+    if (!(error instanceof RequestRateLimitUnavailableError)) throw error;
+    logAuthEvent("login.rate_limit_unavailable", {
+      outcome: "failed",
+      code: "RATE_LIMIT_UNAVAILABLE",
+    });
+    return false;
+  }
+
   const email = emailInput.trim().toLowerCase();
   if (
     !emailPattern.test(email) ||
@@ -528,6 +594,27 @@ export async function verifyLegacyCredentialsAction(
 export async function linkLegacyFirebaseAccountAction(
   idToken: string,
 ): Promise<FormState> {
+  let rateLimit;
+  try {
+    rateLimit = await checkRequestRateLimit("registration");
+  } catch (error) {
+    if (!(error instanceof RequestRateLimitUnavailableError)) throw error;
+    logAuthEvent("registration.rate_limit_unavailable", {
+      outcome: "failed",
+      code: "RATE_LIMIT_UNAVAILABLE",
+    });
+    return {
+      error: "O cadastro está temporariamente indisponível. Tente novamente.",
+    };
+  }
+  if (!rateLimit.allowed) {
+    return {
+      error: `Muitas tentativas de cadastro. Aguarde ${Math.ceil(
+        rateLimit.retryAfterSeconds / 60,
+      )} min e tente novamente.`,
+    };
+  }
+
   const identity = await verifyFirebaseIdToken(idToken);
   if (
     !identity ||

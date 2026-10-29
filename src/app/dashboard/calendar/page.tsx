@@ -364,7 +364,7 @@ export default async function CalendarPage({
         </div>
 
         <aside className="min-w-0">
-          <ScheduleForms services={services} />
+          <ScheduleForms services={services} timeZone={professional.timezone} />
         </aside>
       </div>
     </section>

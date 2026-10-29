@@ -167,7 +167,7 @@ export default async function DashboardLayout({
             role="dialog"
           >
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vitta">
-              Vitta Beauty · Assinatura
+              Vitta Beauty · Planos e pagamentos
             </p>
             <h1
               className="mt-2 text-2xl font-semibold tracking-tight text-vitta-text sm:text-3xl"
@@ -175,7 +175,7 @@ export default async function DashboardLayout({
             >
               {professional.planType === "FREE"
                 ? "Seu período grátis terminou"
-                : "Sua assinatura venceu"}
+                : "Seu plano venceu"}
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-vitta-muted">
               O acesso ao Vitta Beauty foi bloqueado porque seu período de

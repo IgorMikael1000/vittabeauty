@@ -3,10 +3,11 @@ import Link from "next/link";
 import { TransactionForm } from "@/components/finance/transaction-form";
 import { TransactionStatusForm } from "@/components/finance/transaction-status-form";
 import { getAuthenticatedProfessionalId } from "@/lib/authenticated-professional";
+import { sumScheduledMaterialCosts } from "@/lib/financial-aggregates";
 import { getPrismaClient } from "@/lib/prisma";
 import { getReportPeriod } from "@/lib/report-period";
 import { formatDateTime } from "@/lib/schedule";
-import { sumMoneyCents } from "@/lib/money";
+import { decimalToCents } from "@/lib/money";
 
 export const metadata: Metadata = {
   title: "Financeiro",
@@ -51,7 +52,8 @@ export default async function FinancePage({
   const now = new Date();
   const forecastFrom = period.from > now ? period.from : now;
   const [
-    futureAppointments,
+    forecastAppointments,
+    forecastServiceCostCents,
     forecastOtherIncome,
     forecastFixedExpenses,
     realizedIncome,
@@ -59,18 +61,16 @@ export default async function FinancePage({
     realizedFixedExpenses,
     transactions,
   ] = await Promise.all([
-    prisma.appointment.findMany({
+    prisma.appointment.aggregate({
       where: {
         professionalId,
         status: { in: ["PENDING", "CONFIRMED"] },
         startsAt: { gte: forecastFrom, lt: period.to },
       },
-      select: {
-        priceAtBooking: true,
-        service: { select: { materialCost: true } },
-      },
+      _sum: { priceAtBooking: true },
     }),
-    prisma.transaction.findMany({
+    sumScheduledMaterialCosts(professionalId, forecastFrom, period.to),
+    prisma.transaction.aggregate({
       where: {
         professionalId,
         type: "INCOME",
@@ -84,9 +84,9 @@ export default async function FinancePage({
           },
         ],
       },
-      select: { amount: true },
+      _sum: { amount: true },
     }),
-    prisma.transaction.findMany({
+    prisma.transaction.aggregate({
       where: {
         professionalId,
         type: "EXPENSE",
@@ -100,18 +100,18 @@ export default async function FinancePage({
           },
         ],
       },
-      select: { amount: true },
+      _sum: { amount: true },
     }),
-    prisma.transaction.findMany({
+    prisma.transaction.aggregate({
       where: {
         professionalId,
         type: "INCOME",
         status: "PAID",
         paidAt: { gte: period.from, lt: period.to },
       },
-      select: { amount: true },
+      _sum: { amount: true },
     }),
-    prisma.transaction.findMany({
+    prisma.transaction.aggregate({
       where: {
         professionalId,
         type: "EXPENSE",
@@ -119,9 +119,9 @@ export default async function FinancePage({
         appointmentId: { not: null },
         paidAt: { gte: period.from, lt: period.to },
       },
-      select: { amount: true },
+      _sum: { amount: true },
     }),
-    prisma.transaction.findMany({
+    prisma.transaction.aggregate({
       where: {
         professionalId,
         type: "EXPENSE",
@@ -129,7 +129,7 @@ export default async function FinancePage({
         appointmentId: null,
         paidAt: { gte: period.from, lt: period.to },
       },
-      select: { amount: true },
+      _sum: { amount: true },
     }),
     prisma.transaction.findMany({
       where: {
@@ -159,23 +159,15 @@ export default async function FinancePage({
     }),
   ]);
   const grossIncomeCents = isRealized
-    ? sumMoneyCents(realizedIncome)
-    : sumMoneyCents([
-        ...futureAppointments.map((appointment) => ({
-          amount: appointment.priceAtBooking,
-        })),
-        ...forecastOtherIncome,
-      ]);
+    ? decimalToCents(realizedIncome._sum.amount ?? "0")
+    : decimalToCents(forecastAppointments._sum.priceAtBooking ?? "0") +
+      decimalToCents(forecastOtherIncome._sum.amount ?? "0");
   const serviceCostCents = isRealized
-    ? sumMoneyCents(realizedServiceExpenses)
-    : sumMoneyCents(
-        futureAppointments.map((appointment) => ({
-          amount: appointment.service.materialCost,
-        })),
-      );
+    ? decimalToCents(realizedServiceExpenses._sum.amount ?? "0")
+    : forecastServiceCostCents;
   const fixedExpenseCents = isRealized
-    ? sumMoneyCents(realizedFixedExpenses)
-    : sumMoneyCents(forecastFixedExpenses);
+    ? decimalToCents(realizedFixedExpenses._sum.amount ?? "0")
+    : decimalToCents(forecastFixedExpenses._sum.amount ?? "0");
   const netProfitCents =
     grossIncomeCents - serviceCostCents - fixedExpenseCents;
   const cards = [

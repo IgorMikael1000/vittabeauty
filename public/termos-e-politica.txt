@@ -18,7 +18,7 @@ Encarregado pelo tratamento de dados pessoais: Igor Mikael dos Santos
 
 **1. ACEITAÇÃO E ESCOPO**
 
-1.1. Estes Termos regulam o acesso e uso do Vitta Beauty, plataforma digital de gestão voltada a profissionais da beleza. O aplicativo oferece recursos como cadastro de clientes e serviços, agenda, link público para solicitação de agendamentos, controle financeiro, relatórios, gestão de assinatura e configuração do perfil profissional.
+1.1. Estes Termos regulam o acesso e uso do Vitta Beauty, plataforma digital de gestão voltada a profissionais da beleza. O aplicativo oferece recursos como cadastro de clientes e serviços, agenda, link público para solicitação de agendamentos, controle financeiro, relatórios, gestão de planos de acesso e configuração do perfil profissional.
 
 1.2. Ao criar uma conta, acessar ou usar os recursos autenticados, o usuário declara que leu e compreendeu estes Termos e a Política de Privacidade.
 
@@ -33,7 +33,7 @@ Encarregado pelo tratamento de dados pessoais: Igor Mikael dos Santos
 2.3. A conta é destinada ao uso profissional. O usuário não pode compartilhar credenciais de forma que comprometa a segurança, tentar acessar contas ou dados de terceiros, interferir no funcionamento da plataforma, enviar código malicioso ou usar o serviço para atividade ilegal.
 
 2.4. O usuário pode alterar dados de perfil e credenciais nos recursos disponíveis. O usuário pode encerrar e excluir definitivamente sua conta a qualquer momento utilizando o botão **"Excluir minha conta"**, localizado na aba de **Segurança**, dentro da seção **Minha Conta** no painel da plataforma.
-**Importante:** Ao confirmar a exclusão da conta, todos os dados vinculados serão apagados permanentemente. Caso o usuário possua um plano de assinatura ativo no momento da exclusão, **os valores já pagos não serão estornados, reembolsados ou convertidos em crédito**, sendo o encerramento do serviço imediato.
+**Importante:** Ao confirmar a exclusão da conta, o acesso é encerrado e os dados vinculados são removidos da base operacional após a conclusão do processo, incluindo a solicitação de remoção da foto de perfil hospedada no Cloudinary. Cópias em backups e registros mantidos por fornecedores podem seguir os prazos próprios de retenção descritos na Política de Privacidade ou ser conservados quando necessários para cumprir obrigações legais e exercício regular de direitos. Caso o usuário possua um plano ativo no momento da exclusão, **os valores já pagos não serão estornados, reembolsados ou convertidos em crédito**, sendo o encerramento do serviço imediato.
 
 **3. FUNCIONALIDADES E RESPONSABILIDADES DO PROFISSIONAL**
 
@@ -61,11 +61,11 @@ Encarregado pelo tratamento de dados pessoais: Igor Mikael dos Santos
 
 **5. PLANOS, COBRANÇAS E MERCADO PAGO**
 
-5.1. O aplicativo apresenta planos (Mensal, Semestral, Anual) que liberam recursos premium. Os preços, tributos e formas de cobrança são exibidos no momento do checkout.
+5.1. O aplicativo apresenta planos (Mensal, Semestral, Anual) que liberam recursos premium por períodos determinados. Os preços, tributos e forma de pagamento são exibidos no momento do checkout.
 
-5.2. Os pagamentos da assinatura são processados com segurança pelo **Mercado Pago**. O Vitta Beauty não coleta nem armazena números de cartão de crédito. Dados de cartão e credenciais de pagamento são processados diretamente pelo ambiente seguro do Mercado Pago.
+5.2. Os pagamentos dos planos são processados com segurança pelo **Mercado Pago**. O Vitta Beauty não coleta nem armazena números de cartão de crédito. Dados de cartão e credenciais de pagamento são processados diretamente pelo ambiente seguro do Mercado Pago.
 
-5.3. **Regra de Assinatura (Pagamento Único):** A contratação dos planos ocorre por meio de pagamento único via Mercado Pago (Checkout Pro). **Não há renovação automática nem débito recorrente mensal automático** no cartão do usuário. Ao final do período contratado, o acesso aos recursos premium será suspenso até que o usuário decida realizar manualmente uma nova renovação.
+5.3. **Pagamento único e renovação manual:** A contratação de cada período do plano ocorre por meio de um pagamento único via Mercado Pago (Checkout Pro). **Não há assinatura recorrente, renovação automática nem débito automático** no cartão do usuário. Ao final do período contratado, o acesso aos recursos premium será suspenso até que o usuário decida realizar manualmente uma nova compra.
 
 5.4. Uma falha temporária de confirmação do provedor de pagamento pode atrasar a atualização do plano. O usuário deve contatar o suporte apresentando o comprovante gerado pelo Mercado Pago.
 
@@ -92,13 +92,13 @@ Encarregado pelo tratamento de dados pessoais: Igor Mikael dos Santos
 
 **1. QUEM TRATA OS DADOS E EM QUE PAPEL**
 
-1.1. A I&T Solutions (56.387.618 IGOR MIKAEL DOS SANTOS) atua como **Controladora** dos dados de cadastro do profissional (e-mail, CPF, telefone) para administração de contas, autenticação e cobrança de assinaturas.
+1.1. A I&T Solutions (56.387.618 IGOR MIKAEL DOS SANTOS) atua como **Controladora** dos dados de cadastro do profissional (e-mail, CPF, telefone) para administração de contas, autenticação e cobrança dos planos.
 
 1.2. Em relação aos dados de terceiros (Clientes do Salão/Clínica), o profissional atua como **Controlador** (pois ele decide quem cadastrar e os detalhes do atendimento) e a I&T Solutions atua estritamente como **Operadora**, fornecendo o espaço em nuvem para que o profissional armazene sua própria agenda.
 
 **2. QUAIS DADOS PODEM SER TRATADOS**
 
-2.1. **Dados do profissional:** Nome profissional/negócio, e-mail, CPF, telefone, especialidade, slug público, chave PIX e estado da assinatura.
+2.1. **Dados do profissional:** Nome profissional/negócio, e-mail, CPF, telefone, especialidade, foto de perfil, slug público, chave PIX e estado do plano de acesso.
 
 2.2. **Dados das clientes:** Nome, WhatsApp, serviço preferido, horário, histórico e observações fornecidas pela cliente ou pelo profissional. Não devem ser inseridos dados de saúde ou dados sensíveis que não sejam estritamente necessários ao serviço de beleza.
 
@@ -114,7 +114,8 @@ Encarregado pelo tratamento de dados pessoais: Igor Mikael dos Santos
 
 * **Firebase/Google:** Autenticação segura.
 * **Neon/PostgreSQL e Vercel:** Hospedagem do banco de dados e servidores da aplicação.
-* **Mercado Pago:** Processamento do pagamento da assinatura.
+* **Cloudinary:** Hospedagem de fotos de perfil.
+* **Mercado Pago:** Processamento de pagamentos únicos dos planos e das renovações manuais.
 
 **5. COOKIES, SESSÃO E ARMAZENAMENTO**
 
@@ -124,7 +125,9 @@ Encarregado pelo tratamento de dados pessoais: Igor Mikael dos Santos
 
 6.1. Adotamos práticas de segurança de mercado, separação de registros e infraestrutura moderna para proteger seus dados.
 
-6.2. **Exclusão de Conta:** Conforme a LGPD, o titular pode excluir seus dados a qualquer momento acionando o botão "Excluir minha conta" no painel de Segurança. Esta ação eliminará do banco de dados de forma irreversível os dados cadastrais e as agendas do usuário.
+6.2. **Exclusão de Conta:** O titular pode solicitar a exclusão pelo botão "Excluir minha conta" no painel de Segurança. Após a conclusão do processo, os dados cadastrais e operacionais vinculados são removidos da base ativa e a aplicação solicita ao Cloudinary a remoção da foto de perfil. Enquanto uma falha de fornecedor ou infraestrutura impedir a conclusão, o acesso e o agendamento público ficam bloqueados e a solicitação permanece pendente para nova tentativa ou atendimento pelo suporte.
+
+6.3. **Retenção após a exclusão:** A remoção da base ativa não implica eliminação instantânea de cópias técnicas em backups, caches ou sistemas independentes dos fornecedores. Essas cópias podem permanecer pelo ciclo de retenção e descarte aplicável a cada fornecedor, com acesso restrito e sem uso operacional após a exclusão, salvo recuperação necessária de desastre. O Mercado Pago, Firebase/Google, Cloudinary, Neon e Vercel podem manter registros ou cópias conforme suas próprias políticas. Informações necessárias ao cumprimento de obrigações legais ou ao exercício regular de direitos poderão ser conservadas pelo período necessário e, quando aplicável, eliminadas ou anonimizadas ao final desse período. Para solicitar informações sobre a exclusão ou retenção, contate **itsolutions0709@gmail.com**.
 
 **7. DIREITOS DOS TITULARES**
 
@@ -135,4 +138,3 @@ Encarregado pelo tratamento de dados pessoais: Igor Mikael dos Santos
 **8. MENORES DE 18 ANOS**
 
 8.1. A plataforma Vitta Beauty é uma ferramenta comercial destinada estritamente a maiores de 18 anos. Não coletamos intencionalmente dados de menores para criação de contas profissionais. Contas identificadas como pertencentes a menores de idade serão imediatamente encerradas.
-

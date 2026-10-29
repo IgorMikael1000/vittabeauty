@@ -19,6 +19,10 @@ import {
   normalizeClientName,
   normalizeClientWhatsapp,
 } from "@/lib/client-normalization";
+import {
+  checkRequestRateLimit,
+  RequestRateLimitUnavailableError,
+} from "@/lib/request-rate-limit";
 
 class BookingUnavailableError extends Error {}
 
@@ -31,6 +35,23 @@ export async function createPublicBookingAction(
   _previousState: FormState,
   formData: FormData,
 ): Promise<FormState> {
+  let rateLimit;
+  try {
+    rateLimit = await checkRequestRateLimit("public-booking");
+  } catch (error) {
+    if (!(error instanceof RequestRateLimitUnavailableError)) throw error;
+    return {
+      error: "O agendamento está temporariamente indisponível. Tente novamente.",
+    };
+  }
+  if (!rateLimit.allowed) {
+    return {
+      error: `Muitas solicitações. Aguarde ${Math.ceil(
+        rateLimit.retryAfterSeconds / 60,
+      )} min e tente novamente.`,
+    };
+  }
+
   const slug = formData.get("slug");
   const serviceId = formData.get("serviceId");
   const date = formData.get("date");
@@ -62,7 +83,7 @@ export async function createPublicBookingAction(
 
   const prisma = getPrismaClient();
   const professional = await prisma.professional.findUnique({
-    where: { slug },
+    where: { slug, deletionPendingAt: null },
     select: { id: true, timezone: true, pixKey: true, expiresAt: true },
   });
 
@@ -190,7 +211,7 @@ export async function createPublicBookingAction(
             where: {
               professionalId: professional.id,
               status: { in: activeAppointmentStatuses },
-              startsAt: { lt: endsAt },
+              startsAt: { gte: bounds.start, lt: endsAt },
               endsAt: { gt: startsAt },
             },
             select: { id: true },

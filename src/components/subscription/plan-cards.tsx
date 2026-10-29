@@ -34,7 +34,7 @@ function SubscribeButton({ planType }: { planType: SubscriptionPlanType }) {
         disabled={pending}
         type="submit"
       >
-        {pending ? "Preparando checkout..." : "Assinar"}
+        {pending ? "Preparando pagamento..." : "Comprar acesso"}
       </button>
     </form>
   );
@@ -88,8 +88,8 @@ export function PlanCards({ horizontal = false }: { horizontal?: boolean }) {
               {plan.intervalLabel}
             </p>
             <p className="mt-4 flex-1 text-sm leading-6 text-vitta-muted">
-              Acesso completo ao Vitta Beauty após a confirmação do pagamento
-              pelo Mercado Pago.
+              Pagamento único pelo período indicado. A renovação é manual e o
+              acesso começa após a confirmação do Mercado Pago.
             </p>
             <SubscribeButton planType={planType} />
           </article>

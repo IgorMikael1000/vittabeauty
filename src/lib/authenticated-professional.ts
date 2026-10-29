@@ -9,9 +9,11 @@ export async function getCurrentProfessionalId(): Promise<string | null> {
 
   const professional = await getPrismaClient().professional.findUnique({
     where: { firebaseUid: session.uid },
-    select: { id: true },
+    select: { id: true, deletionPendingAt: true },
   });
-  return professional?.id ?? null;
+  return professional && !professional.deletionPendingAt
+    ? professional.id
+    : null;
 }
 
 export async function getAuthenticatedProfessionalId(
@@ -24,10 +26,13 @@ export async function getAuthenticatedProfessionalId(
 
   const professional = await getPrismaClient().professional.findUnique({
     where: { firebaseUid: session.uid },
-    select: { id: true, expiresAt: true },
+    select: { id: true, expiresAt: true, deletionPendingAt: true },
   });
   if (!professional) {
     redirect("/login");
+  }
+  if (professional.deletionPendingAt) {
+    redirect("/login?accountDeletionPending=1");
   }
 
   if (!options.allowExpired) {

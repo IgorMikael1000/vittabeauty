@@ -9,13 +9,13 @@ import { syncCheckoutPayment } from "@/lib/subscription-payments";
 import { subscriptionPlans } from "@/lib/subscriptions";
 
 export const metadata: Metadata = {
-  title: "Assinatura",
+  title: "Plano e pagamentos",
 };
 
 const statusLabels: Record<string, string> = {
   TRIAL: "Período grátis",
   ACTIVE: "Ativa",
-  CANCELED: "Cancelada — acesso até o vencimento",
+  CANCELED: "Encerrada",
   EXPIRED: "Expirada",
 };
 
@@ -63,7 +63,7 @@ export default async function SubscriptionPage({
     } else {
       const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
       if (!accessToken) {
-        console.error(
+          console.error(
           "MERCADOPAGO_ACCESS_TOKEN is not configured for checkout return validation.",
         );
         paymentNotice = {
@@ -116,10 +116,10 @@ export default async function SubscriptionPage({
             };
           }
         } catch (error) {
-          console.error(
-            "[Mercado Pago] Falha ao validar retorno do Checkout Pro:",
-            error,
-          );
+          console.error("[Mercado Pago] Checkout return validation failed.", {
+            correlationId: crypto.randomUUID(),
+            code: error instanceof Error ? error.name : "UNKNOWN_ERROR",
+          });
           paymentNotice = {
             message:
               "Não foi possível confirmar o pagamento agora. A confirmação será atualizada pelo webhook.",
@@ -136,7 +136,6 @@ export default async function SubscriptionPage({
       subscriptionStatus: true,
       planType: true,
       expiresAt: true,
-      mpSubscriptionId: true,
     },
   });
   if (!professional) {
@@ -168,7 +167,7 @@ export default async function SubscriptionPage({
         Plano e pagamentos
       </p>
       <h1 className="mt-1 text-[28px] font-semibold tracking-[-0.04em] text-vitta-text">
-        Assinatura
+        Plano e pagamentos
       </h1>
       {paymentNotice && (
         <p
@@ -200,17 +199,12 @@ export default async function SubscriptionPage({
           Acesso até:{" "}
           <strong className="text-vitta-text">{expiresAt}</strong>
         </p>
-        {professional.mpSubscriptionId && (
-          <p className="mt-2 text-xs text-vitta-muted">
-            Assinatura gerenciada pelo Mercado Pago.
-          </p>
-        )}
       </div>
       <h2 className="mt-8 text-lg font-semibold text-vitta-text">
         Escolha seu plano
       </h2>
       <p className="mt-1 text-sm text-vitta-muted">
-        O checkout é processado com segurança pelo Mercado Pago.
+        Pagamento único pelo Mercado Pago. A renovação do acesso é manual.
       </p>
       <div className="mt-4">
         <PlanCards />
