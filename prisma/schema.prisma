@@ -31,6 +31,11 @@ enum ProfessionalRole {
   ADMIN
 }
 
+enum AccountDeletionJobStatus {
+  PENDING
+  PROCESSING
+}
+
 model Professional {
   id                   String                @id @default(cuid())
   name                 String
@@ -204,4 +209,21 @@ model AdminAuditLog {
 
   @@index([actorProfessionalId, createdAt])
   @@index([action, createdAt])
+}
+
+model AccountDeletionJob {
+  id                 String                   @id @default(cuid())
+  professionalId     String                   @unique
+  firebaseUid        String                   @unique
+  cloudinaryPublicId String?
+  status             AccountDeletionJobStatus @default(PENDING)
+  attempts           Int                      @default(0)
+  nextAttemptAt      DateTime                 @default(now())
+  lockedUntil        DateTime?
+  lastErrorCode      String?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  @@index([status, nextAttemptAt])
+  @@index([status, lockedUntil])
 }

@@ -61,7 +61,6 @@ export function DeleteAccountForm({
   const [cpf, setCpf] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [pendingDeletionToken, setPendingDeletionToken] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [step, setStep] = useState<"explanation" | "confirmation">(
     "explanation",
@@ -75,11 +74,9 @@ export function DeleteAccountForm({
   );
   const canSubmit = Boolean(
     user &&
-      email.trim() &&
-      cpf.trim() &&
-      (pendingDeletionToken ||
-        hasGoogleProvider ||
-        (hasPasswordProvider && password)),
+    email.trim() &&
+    cpf.trim() &&
+    (hasGoogleProvider || (hasPasswordProvider && password)),
   );
   const accessExpiryMessage = getAccessExpiryMessage(
     subscriptionStatus,
@@ -113,48 +110,41 @@ export function DeleteAccountForm({
           return;
         }
 
-        let idToken = pendingDeletionToken;
-        if (!idToken) {
-          if (hasGoogleProvider) {
-            await reauthenticateWithPopup(currentUser, googleProvider);
-          } else if (hasPasswordProvider && currentUser.email) {
-            await reauthenticateWithCredential(
-              currentUser,
-              EmailAuthProvider.credential(currentUser.email, password),
-            );
-          } else {
-            setError(
-              "Não foi possível confirmar sua identidade com o método de acesso desta conta.",
-            );
-            return;
-          }
-          idToken = await currentUser.getIdToken(true);
+        if (hasGoogleProvider) {
+          await reauthenticateWithPopup(currentUser, googleProvider);
+        } else if (hasPasswordProvider && currentUser.email) {
+          await reauthenticateWithCredential(
+            currentUser,
+            EmailAuthProvider.credential(currentUser.email, password),
+          );
+        } else {
+          setError(
+            "Não foi possível confirmar sua identidade com o método de acesso desta conta.",
+          );
+          return;
         }
 
         const result = await deleteProfessionalAccountAction(
           email,
           cpf,
-          idToken,
+          await currentUser.getIdToken(true),
         );
         if (result.error) {
-          if (result.cleanupPending) {
-            setPendingDeletionToken(idToken);
-            setError(result.error);
-            return;
-          }
-          setPendingDeletionToken("");
           setError(result.error);
           return;
         }
 
-        setPendingDeletionToken("");
         await signOut(auth).catch((signOutError: unknown) => {
           console.error(
             "Could not clear Firebase client state after account deletion.",
             signOutError,
           );
         });
-        router.replace("/login?accountDeleted=1");
+        router.replace(
+          result.pending
+            ? "/login?accountDeletionPending=1"
+            : "/login?accountDeleted=1",
+        );
         router.refresh();
       } catch (deleteError) {
         const code =
@@ -321,12 +311,7 @@ export function DeleteAccountForm({
                   />
                 </label>
 
-                {pendingDeletionToken ? (
-                  <p className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
-                    A solicitação já foi iniciada. Tente concluí-la novamente
-                    sem fechar esta página.
-                  </p>
-                ) : user && hasGoogleProvider ? (
+                {user && hasGoogleProvider ? (
                   <p className="rounded-2xl border border-vitta-border bg-vitta-background/70 p-4 text-sm leading-6 text-vitta-muted">
                     Esta conta usa o Google para entrar. Ao continuar, será
                     solicitada uma nova confirmação da sua conta Google.
@@ -369,11 +354,7 @@ export function DeleteAccountForm({
                     disabled={pending || !canSubmit}
                     type="submit"
                   >
-                    {pending
-                      ? "Excluindo conta..."
-                      : pendingDeletionToken
-                        ? "Tentar concluir exclusão"
-                        : "Confirmar exclusão"}
+                    {pending ? "Enviando solicitação..." : "Confirmar exclusão"}
                   </button>
                 </div>
               </form>

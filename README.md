@@ -198,11 +198,9 @@ remover o suporte legado.
   `UPSTASH_REDIS_REST_TOKEN` no servidor antes da exposição à internet; sem
   essas credenciais ou sem acesso ao Redis, as ações são recusadas.
 - A exclusão da conta marca primeiro o perfil com `deletionPendingAt`, bloqueia
-  o acesso autenticado e desativa o agendamento público antes de remover o
-  usuário do Firebase e apagar os dados relacionais em uma transação. Se uma
-  etapa falhar, a solicitação permanece pendente e pode ser tentada novamente
-  na tela atual; se a sessão for encerrada antes da conclusão, o suporte deve
-  finalizar a solicitação.
+  o acesso autenticado e desativa o agendamento público, registrando uma tarefa
+  persistente. O Cron da Vercel remove o usuário do Firebase, a foto do Cloudinary
+  e os dados relacionais; falhas são retentadas automaticamente com backoff.
 - O trial profissional dura três dias a partir do cadastro. Após o vencimento,
   o dashboard exige a escolha de um plano; o link público de agendamento fica
   indisponível até que um pagamento de plano seja confirmado.
@@ -231,6 +229,12 @@ variáveis no projeto antes do primeiro deploy:
   `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`,
   `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` e `NEXT_PUBLIC_FIREBASE_APP_ID`:
   configuração pública do app Web Firebase usado pelo Authentication.
+- `FIREBASE_ADMIN_CLIENT_EMAIL` e `FIREBASE_ADMIN_PRIVATE_KEY`: credencial
+  server-only de uma service account com a função Firebase Authentication Admin,
+  usada exclusivamente para concluir exclusões sem depender da sessão do usuário.
+- `CRON_SECRET`: segredo server-only usado para autenticar o Cron da Vercel que
+  processa exclusões pendentes a cada cinco minutos. O plano Vercel precisa
+  permitir essa frequência de Cron.
 - `CLOUDINARY_CLOUD_NAME` e `CLOUDINARY_API_KEY`: configuração do Cloudinary.
 - `CLOUDINARY_API_SECRET`: segredo server-only do Cloudinary.
 - `MERCADOPAGO_ACCESS_TOKEN`: token de acesso de produção do Mercado Pago.
@@ -238,6 +242,13 @@ variáveis no projeto antes do primeiro deploy:
   Pago.
 - `UPSTASH_REDIS_REST_URL` e `UPSTASH_REDIS_REST_TOKEN`: credenciais server-only
   do Upstash Redis para rate limiting distribuído.
+
+Configure a service account no Google Cloud/Firebase e armazene a chave privada
+somente nas variáveis server-only da Vercel. Em `FIREBASE_ADMIN_PRIVATE_KEY`,
+preserve as quebras de linha da chave como `\n`. Gere um valor aleatório para
+`CRON_SECRET`; não reutilize `AUTH_SESSION_SECRET`. O Cron retenta exclusões com
+backoff exponencial (de um minuto até 24 horas), registra apenas código de erro
+seguro e remove a tarefa quando todas as etapas são concluídas.
 
 O build executa `prisma generate && next build`. Alterações ao schema do banco
 devem ser aplicadas explicitamente com migrations antes de disponibilizar a
