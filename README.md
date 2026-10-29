@@ -233,8 +233,9 @@ variáveis no projeto antes do primeiro deploy:
   server-only de uma service account com a função Firebase Authentication Admin,
   usada exclusivamente para concluir exclusões sem depender da sessão do usuário.
 - `CRON_SECRET`: segredo server-only usado para autenticar o Cron da Vercel que
-  processa exclusões pendentes a cada cinco minutos. O plano Vercel precisa
-  permitir essa frequência de Cron.
+  processa exclusões pendentes diariamente às 03:00 UTC, compatível com o plano
+  Hobby. Nesse plano, uma nova tentativa pode aguardar até cerca de um dia;
+  falhas repetidas podem prolongar o prazo total da exclusão.
 - `CLOUDINARY_CLOUD_NAME` e `CLOUDINARY_API_KEY`: configuração do Cloudinary.
 - `CLOUDINARY_API_SECRET`: segredo server-only do Cloudinary.
 - `MERCADOPAGO_ACCESS_TOKEN`: token de acesso de produção do Mercado Pago.
