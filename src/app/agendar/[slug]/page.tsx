@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { PublicBookingForm } from "@/components/booking/public-booking-form";
+import { PublicBookingDateCalendar } from "@/components/booking/public-booking-date-calendar";
 import {
   buildAvailableSlots,
   getDayBounds,
@@ -172,6 +173,32 @@ export default async function PublicBookingPage({
 
   const today = getDateInTimezone(new Date(), professional.timezone);
   const date = query.date ?? today;
+  const dateMaxDate = new Date(`${today}T00:00:00.000Z`);
+  dateMaxDate.setUTCDate(dateMaxDate.getUTCDate() + 90);
+  const dateMax = dateMaxDate.toISOString().slice(0, 10);
+  const todayBounds = getDayBounds(today, professional.timezone);
+  const dateMaxBounds = getDayBounds(dateMax, professional.timezone);
+  if (!todayBounds || !dateMaxBounds) {
+    throw new Error(
+      `Could not resolve booking date range for timezone "${professional.timezone}".`,
+    );
+  }
+  const calendarBlocks = await prisma.calendarBlock.findMany({
+    where: {
+      professionalId: professional.id,
+      startsAt: { lt: dateMaxBounds.end },
+      endsAt: { gt: todayBounds.start },
+    },
+    select: { startsAt: true },
+  });
+  const blockedDates = [
+    ...new Set(
+      calendarBlocks.map((block) =>
+        getDateInTimezone(block.startsAt, professional.timezone),
+      ),
+    ),
+  ];
+  const blockedDateSet = new Set(blockedDates);
   const selectedService =
     professional.services.find((service) => service.id === query.serviceId) ??
     null;
@@ -239,9 +266,6 @@ export default async function PublicBookingPage({
     }
   }
 
-  const maxDate = new Date(`${today}T00:00:00.000Z`);
-  maxDate.setUTCDate(maxDate.getUTCDate() + 90);
-  const dateMax = maxDate.toISOString().slice(0, 10);
   const formattedDate = validDate
     ? new Intl.DateTimeFormat("pt-BR", {
         timeZone: "UTC",
@@ -328,48 +352,18 @@ export default async function PublicBookingPage({
             </div>
           ) : (
             <>
-              <form
-                action={`/agendar/${encodeURIComponent(slug)}`}
-                className="grid gap-4 sm:grid-cols-[1fr_auto]"
-              >
-                <label className="block text-sm font-medium text-vitta-text">
-                  Serviço
-                  <select
-                    className="mt-1.5 w-full rounded-xl border border-vitta-border bg-white px-3 py-3 outline-none focus:border-vitta focus:ring-2 focus:ring-vitta/15"
-                    defaultValue={selectedService?.id ?? ""}
-                    name="serviceId"
-                    required
-                  >
-                    <option disabled value="">
-                      Selecione um serviço
-                    </option>
-                    {professional.services.map((service) => (
-                      <option key={service.id} value={service.id}>
-                        {service.name} · {currency.format(Number(service.price))} ·{" "}
-                        {service.durationMinutes} min
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="block text-sm font-medium text-vitta-text">
-                  Data
-                  <input
-                    className="mt-1.5 w-full rounded-xl border border-vitta-border px-3 py-3 outline-none focus:border-vitta focus:ring-2 focus:ring-vitta/15"
-                    defaultValue={date}
-                    max={dateMax}
-                    min={today}
-                    name="date"
-                    required
-                    type="date"
-                  />
-                </label>
-                <button
-                  className="rounded-xl border border-vitta px-4 py-3 text-sm font-semibold text-vitta transition hover:bg-vitta/5 sm:col-span-2"
-                  type="submit"
-                >
-                  Consultar horários
-                </button>
-              </form>
+              <PublicBookingDateCalendar
+                blockedDates={blockedDates}
+                maxDate={dateMax}
+                minDate={today}
+                selectedDate={date}
+                selectedServiceId={selectedService?.id ?? ""}
+                services={professional.services.map((service) => ({
+                  ...service,
+                  price: Number(service.price),
+                }))}
+                slug={slug}
+              />
 
               {selectedService && (
                 <section className="rounded-2xl border border-vitta-border p-4 sm:p-5">
@@ -403,6 +397,11 @@ export default async function PublicBookingPage({
                     <p className="rounded-xl bg-vitta-background p-4 text-sm text-vitta-muted">
                       Escolha uma data entre hoje e os próximos 90 dias para
                       consultar a disponibilidade.
+                    </p>
+                  ) : blockedDateSet.has(date) ? (
+                    <p className="rounded-xl bg-gray-100 p-4 text-sm text-gray-600">
+                      Este dia está bloqueado. Escolha outra data para consultar
+                      os horários.
                     </p>
                   ) : (
                     <PublicBookingForm

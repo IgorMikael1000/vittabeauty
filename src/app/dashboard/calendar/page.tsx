@@ -63,6 +63,10 @@ export default async function CalendarPage({
     select: { timezone: true, name: true },
   });
   const range = getCalendarRange(params.date, params.view, professional.timezone);
+  const today = getDateInTimezone(new Date(), professional.timezone);
+  const nextDay = new Date(`${today}T00:00:00.000Z`);
+  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+  const minimumBlockDate = nextDay.toISOString().slice(0, 10);
   const [appointments, blocks, services] = await Promise.all([
       prisma.appointment.findMany({
         where: {
@@ -247,11 +251,24 @@ export default async function CalendarPage({
                   startsAt: appointment.startsAt,
                   appointment,
                 })),
-                ...dayBlocks.map((block) => ({
-                  type: "block" as const,
-                  startsAt: block.startsAt,
-                  block,
-                })),
+                ...dayBlocks.map((block) => {
+                  const startsAtTime = formatTime(
+                    block.startsAt,
+                    professional.timezone,
+                  );
+                  const endsAtTime = formatTime(
+                    block.endsAt,
+                    professional.timezone,
+                  );
+
+                  return {
+                    type: "block" as const,
+                    startsAt: block.startsAt,
+                    block,
+                    isFullDay:
+                      startsAtTime === "00:00" && endsAtTime === "00:00",
+                  };
+                }),
               ].sort(
                 (left, right) =>
                   left.startsAt.getTime() - right.startsAt.getTime(),
@@ -337,21 +354,26 @@ export default async function CalendarPage({
                             key={entry.block.id}
                           >
                             <p className="font-semibold text-vitta-text">
-                              {formatTime(
-                                entry.block.startsAt,
-                                professional.timezone,
-                              )}{" "}
-                              –{" "}
-                              {formatTime(
-                                entry.block.endsAt,
-                                professional.timezone,
-                              )}{" "}
-                              · Horário bloqueado
+                              {entry.isFullDay
+                                ? "Dia inteiro bloqueado"
+                                : `${formatTime(
+                                    entry.block.startsAt,
+                                    professional.timezone,
+                                  )} – ${formatTime(
+                                    entry.block.endsAt,
+                                    professional.timezone,
+                                  )} · Horário bloqueado`}
                             </p>
                             <p className="mt-1 text-sm text-vitta-muted">
-                              {entry.block.reason ?? "Indisponível"}
+                              {entry.block.reason ??
+                                (entry.isFullDay
+                                  ? "Todos os horários desta data estão indisponíveis."
+                                  : "Indisponível")}
                             </p>
-                            <DeleteCalendarBlockForm blockId={entry.block.id} />
+                            <DeleteCalendarBlockForm
+                              blockId={entry.block.id}
+                              isFullDay={entry.isFullDay}
+                            />
                           </li>
                         ),
                       )}
@@ -364,7 +386,11 @@ export default async function CalendarPage({
         </div>
 
         <aside className="min-w-0">
-          <ScheduleForms services={services} timeZone={professional.timezone} />
+          <ScheduleForms
+            minimumBlockDate={minimumBlockDate}
+            services={services}
+            timeZone={professional.timezone}
+          />
         </aside>
       </div>
     </section>

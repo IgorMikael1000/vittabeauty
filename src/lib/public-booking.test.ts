@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildAvailableSlots,
   getDayBounds,
+  getFutureCalendarBlockBounds,
   isValidBookingDate,
 } from "./public-booking";
 
@@ -109,5 +110,34 @@ describe("booking date helpers", () => {
       start: new Date("2026-06-15T03:00:00.000Z"),
       end: new Date("2026-06-16T03:00:00.000Z"),
     });
+  });
+
+  it("only allows blocking a complete future local day", () => {
+    const fixedNow = new Date("2026-06-15T12:00:00.000Z");
+
+    expect(
+      getFutureCalendarBlockBounds(
+        "2026-06-16",
+        "America/Sao_Paulo",
+        fixedNow,
+      ),
+    ).toEqual({
+      start: new Date("2026-06-16T03:00:00.000Z"),
+      end: new Date("2026-06-17T03:00:00.000Z"),
+    });
+    expect(
+      getFutureCalendarBlockBounds(
+        "2026-06-15",
+        "America/Sao_Paulo",
+        fixedNow,
+      ),
+    ).toBeNull();
+    expect(
+      getFutureCalendarBlockBounds(
+        "2026-02-31",
+        "America/Sao_Paulo",
+        fixedNow,
+      ),
+    ).toBeNull();
   });
 });

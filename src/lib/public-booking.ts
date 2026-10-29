@@ -62,6 +62,30 @@ export function getDayBounds(
   return start && end ? { start, end } : null;
 }
 
+export function getFutureCalendarBlockBounds(
+  date: string,
+  timeZone: string,
+  now: Date = new Date(),
+): { start: Date; end: Date } | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return null;
+  }
+
+  const localNoon = parseDateTimeInTimezone(`${date}T12:00`, timeZone);
+  const bounds = getDayBounds(date, timeZone);
+
+  if (
+    !localNoon ||
+    getDateInTimezone(localNoon, timeZone) !== date ||
+    !bounds ||
+    bounds.start <= now
+  ) {
+    return null;
+  }
+
+  return bounds;
+}
+
 function getMinuteOfDay(date: Date, timeZone: string): number {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,

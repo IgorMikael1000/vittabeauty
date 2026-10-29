@@ -7,7 +7,13 @@ import { FormFeedback } from "@/components/forms/form-feedback";
 
 const initialState: FormState = {};
 
-export function DeleteCalendarBlockForm({ blockId }: { blockId: string }) {
+export function DeleteCalendarBlockForm({
+  blockId,
+  isFullDay,
+}: {
+  blockId: string;
+  isFullDay: boolean;
+}) {
   const [state, formAction, pending] = useActionState(
     deleteCalendarBlockAction,
     initialState,
@@ -22,7 +28,11 @@ export function DeleteCalendarBlockForm({ blockId }: { blockId: string }) {
         disabled={pending}
         type="submit"
       >
-        {pending ? "Removendo..." : "Remover bloqueio"}
+        {pending
+          ? "Removendo..."
+          : isFullDay
+            ? "Desbloquear dia"
+            : "Remover bloqueio"}
       </button>
     </form>
   );

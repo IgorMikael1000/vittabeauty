@@ -14,9 +14,14 @@ const initialState: FormState = {};
 type ScheduleFormsProps = {
   services: Array<{ id: string; name: string; durationMinutes: number }>;
   timeZone: string;
+  minimumBlockDate: string;
 };
 
-export function ScheduleForms({ services, timeZone }: ScheduleFormsProps) {
+export function ScheduleForms({
+  services,
+  timeZone,
+  minimumBlockDate,
+}: ScheduleFormsProps) {
   const [hasSelectedClient, setHasSelectedClient] = useState(false);
   const [appointmentState, appointmentAction, appointmentPending] =
     useActionState(createAppointmentAction, initialState);
@@ -94,10 +99,10 @@ export function ScheduleForms({ services, timeZone }: ScheduleFormsProps) {
       <details className="rounded-2xl border border-vitta-border bg-white shadow-card">
         <summary className="cursor-pointer list-none p-5 sm:p-6">
           <span className="block font-semibold text-vitta-text">
-            Bloquear horário pontual
+            Bloquear dia
           </span>
           <span className="mt-1 block text-sm text-vitta-muted">
-            Indisponibilize um período em uma data específica.
+            Indisponibilize todos os horários de uma data.
           </span>
         </summary>
         <form
@@ -105,33 +110,17 @@ export function ScheduleForms({ services, timeZone }: ScheduleFormsProps) {
           className="space-y-4 border-t border-vitta-border p-5 sm:p-6"
         >
           <p className="text-xs text-vitta-muted">
-            Os horários são interpretados no fuso {timeZone}.
+            O dia inteiro será bloqueado no fuso {timeZone}. Dias com
+            atendimentos não podem ser bloqueados.
           </p>
           <label className="block text-sm font-medium text-vitta-text">
-            Início
+            Data
             <input
               className="mt-1.5 w-full rounded-xl border border-vitta-border px-3 py-2.5 outline-none focus:border-vitta focus:ring-2 focus:ring-vitta/15"
-              name="startsAt"
+              min={minimumBlockDate}
+              name="date"
               required
-              type="datetime-local"
-            />
-          </label>
-          <label className="block text-sm font-medium text-vitta-text">
-            Fim
-            <input
-              className="mt-1.5 w-full rounded-xl border border-vitta-border px-3 py-2.5 outline-none focus:border-vitta focus:ring-2 focus:ring-vitta/15"
-              name="endsAt"
-              required
-              type="datetime-local"
-            />
-          </label>
-          <label className="block text-sm font-medium text-vitta-text">
-            Motivo (opcional)
-            <input
-              className="mt-1.5 w-full rounded-xl border border-vitta-border px-3 py-2.5 outline-none focus:border-vitta focus:ring-2 focus:ring-vitta/15"
-              maxLength={120}
-              name="reason"
-              type="text"
+              type="date"
             />
           </label>
           <FormFeedback state={blockState} />
@@ -140,7 +129,7 @@ export function ScheduleForms({ services, timeZone }: ScheduleFormsProps) {
             disabled={blockPending}
             type="submit"
           >
-            {blockPending ? "Salvando..." : "Bloquear horário"}
+            {blockPending ? "Bloqueando..." : "Bloquear dia"}
           </button>
         </form>
       </details>

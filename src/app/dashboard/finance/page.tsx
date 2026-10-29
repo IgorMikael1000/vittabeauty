@@ -49,33 +49,20 @@ export default async function FinancePage({
   });
   const period = getReportPeriod(query.from, query.to, professional.timezone);
   const isRealized = query.view === "realized";
-  const now = new Date();
-  const forecastFrom = period.from > now ? period.from : now;
   const [
-    forecastAppointments,
+    forecastIncome,
     forecastServiceCostCents,
-    forecastOtherIncome,
     forecastFixedExpenses,
     realizedIncome,
     realizedServiceExpenses,
     realizedFixedExpenses,
     transactions,
   ] = await Promise.all([
-    prisma.appointment.aggregate({
-      where: {
-        professionalId,
-        status: { in: ["PENDING", "CONFIRMED"] },
-        startsAt: { gte: forecastFrom, lt: period.to },
-      },
-      _sum: { priceAtBooking: true },
-    }),
-    sumScheduledMaterialCosts(professionalId, forecastFrom, period.to),
     prisma.transaction.aggregate({
       where: {
         professionalId,
         type: "INCOME",
         status: "PENDING",
-        appointmentId: null,
         OR: [
           { dueAt: { gte: period.from, lt: period.to } },
           {
@@ -86,6 +73,7 @@ export default async function FinancePage({
       },
       _sum: { amount: true },
     }),
+    sumScheduledMaterialCosts(professionalId, period.from, period.to),
     prisma.transaction.aggregate({
       where: {
         professionalId,
@@ -158,12 +146,20 @@ export default async function FinancePage({
       },
     }),
   ]);
+  const forecastGrossIncomeCents = decimalToCents(
+    forecastIncome._sum.amount ?? "0",
+  );
+  const realizedGrossIncomeCents = decimalToCents(
+    realizedIncome._sum.amount ?? "0",
+  );
   const grossIncomeCents = isRealized
-    ? decimalToCents(realizedIncome._sum.amount ?? "0")
-    : decimalToCents(forecastAppointments._sum.priceAtBooking ?? "0") +
-      decimalToCents(forecastOtherIncome._sum.amount ?? "0");
+    ? realizedGrossIncomeCents
+    : forecastGrossIncomeCents;
+  const realizedServiceCostCents = decimalToCents(
+    realizedServiceExpenses._sum.amount ?? "0",
+  );
   const serviceCostCents = isRealized
-    ? decimalToCents(realizedServiceExpenses._sum.amount ?? "0")
+    ? realizedServiceCostCents
     : forecastServiceCostCents;
   const fixedExpenseCents = isRealized
     ? decimalToCents(realizedFixedExpenses._sum.amount ?? "0")
@@ -176,7 +172,10 @@ export default async function FinancePage({
       value: formatCents(grossIncomeCents),
       description: isRealized
         ? "Receitas efetivamente pagas no período"
-        : "Agendamentos futuros pendentes ou confirmados e outras receitas previstas",
+        : "Receitas pendentes de pagamento no período, incluindo atendimentos concluídos ainda não pagos",
+      comparison: isRealized
+        ? `Previsto: ${formatCents(forecastGrossIncomeCents)}`
+        : `Já pago: ${formatCents(realizedGrossIncomeCents)}`,
     },
     {
       label: "Custos de Serviços",
@@ -184,6 +183,9 @@ export default async function FinancePage({
       description: isRealized
         ? "Custos de material registrados em atendimentos concluídos"
         : "Materiais estimados para agendamentos pendentes ou confirmados",
+      comparison: isRealized
+        ? `Previsto: ${formatCents(forecastServiceCostCents)}`
+        : `Realizado: ${formatCents(realizedServiceCostCents)}`,
     },
     {
       label: "Despesas Fixas",
@@ -297,6 +299,11 @@ export default async function FinancePage({
             <p className="mt-2 text-xs leading-5 text-vitta-muted">
               {card.description}
             </p>
+            {"comparison" in card && (
+              <span className="mt-3 inline-flex rounded-full bg-vitta-background px-2.5 py-1 text-xs font-medium text-vitta-text">
+                {card.comparison}
+              </span>
+            )}
           </article>
         ))}
       </div>

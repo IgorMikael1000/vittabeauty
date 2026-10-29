@@ -8,7 +8,7 @@ import {
 } from "@/generated/prisma/client";
 import { revalidatePath } from "next/cache";
 import { getAuthenticatedProfessionalId } from "@/lib/authenticated-professional";
-import { getDayBounds } from "@/lib/public-booking";
+import { getFutureCalendarBlockBounds, getDayBounds } from "@/lib/public-booking";
 import {
   getDateInTimezone,
   getWeekdayInTimezone,
@@ -250,42 +250,26 @@ export async function createCalendarBlockAction(
   formData: FormData,
 ): Promise<FormState> {
   const professionalId = await getAuthenticatedProfessionalId();
-  const startInput = formData.get("startsAt");
-  const endInput = formData.get("endsAt");
-  const rawReason = formData.get("reason");
+  const date = formData.get("date");
 
-  if (
-    typeof startInput !== "string" ||
-    typeof endInput !== "string" ||
-    (rawReason !== null && typeof rawReason !== "string")
-  ) {
-    return { error: "Informe um período de bloqueio válido." };
-  }
-
-  const reason = typeof rawReason === "string" ? rawReason.trim() || null : null;
-  if ((reason?.length ?? 0) > 120) {
-    return { error: "O motivo deve ter no máximo 120 caracteres." };
+  if (typeof date !== "string") {
+    return { error: "Selecione a data que deseja bloquear." };
   }
 
   const prisma = getPrismaClient();
   const professional = await prisma.professional.findUnique({
     where: { id: professionalId },
-    select: { timezone: true },
+    select: { timezone: true, slug: true },
   });
   if (!professional) {
     return { error: "Profissional não encontrado." };
   }
 
-  const startsAt = parseDateTimeInTimezone(startInput, professional.timezone);
-  const endsAt = parseDateTimeInTimezone(endInput, professional.timezone);
-  if (!startsAt || !endsAt || startsAt <= new Date() || endsAt <= startsAt) {
-    return { error: "Informe início e fim futuros válidos para o bloqueio." };
-  }
-  if (
-    getDateInTimezone(startsAt, professional.timezone) !==
-    getDateInTimezone(endsAt, professional.timezone)
-  ) {
-    return { error: "O bloqueio deve começar e terminar no mesmo dia." };
+  const bounds = getFutureCalendarBlockBounds(date, professional.timezone);
+  if (!bounds) {
+    return {
+      error: "Selecione um dia inteiro futuro para bloquear.",
+    };
   }
 
   try {
@@ -296,38 +280,33 @@ export async function createCalendarBlockAction(
             where: {
               professionalId,
               status: { in: activeAppointmentStatuses },
-              startsAt: { lt: endsAt },
-              endsAt: { gt: startsAt },
+              startsAt: { lt: bounds.end },
+              endsAt: { gt: bounds.start },
             },
             select: { id: true },
           }),
           transaction.calendarBlock.findFirst({
             where: {
               professionalId,
-              startsAt: { lt: endsAt },
-              endsAt: { gt: startsAt },
+              startsAt: { lt: bounds.end },
+              endsAt: { gt: bounds.start },
             },
             select: { id: true },
           }),
         ]);
-
         if (appointmentConflict) {
           throw new SlotValidationError(
-            "Este período conflita com um atendimento existente.",
+            "Este dia tem atendimentos agendados e não pode ser bloqueado.",
           );
         }
         if (blockConflict) {
-          throw new SlotValidationError(
-            "Este período já está total ou parcialmente bloqueado.",
-          );
+          throw new SlotValidationError("Este dia já está bloqueado.");
         }
-
         await transaction.calendarBlock.create({
           data: {
             professionalId,
-            startsAt,
-            endsAt,
-            reason,
+            startsAt: bounds.start,
+            endsAt: bounds.end,
           },
         });
       },
@@ -352,7 +331,8 @@ export async function createCalendarBlockAction(
   }
 
   revalidatePath("/dashboard/calendar");
-  return { success: "Bloqueio adicionado à agenda." };
+  revalidatePath(`/agendar/${professional.slug}`);
+  return { success: "Dia bloqueado na agenda." };
 }
 
 export async function deleteCalendarBlockAction(
@@ -366,15 +346,25 @@ export async function deleteCalendarBlockAction(
     return { error: "Bloqueio inválido." };
   }
 
-  const result = await getPrismaClient().calendarBlock.deleteMany({
+  const prisma = getPrismaClient();
+  const block = await prisma.calendarBlock.findFirst({
     where: { id: blockId, professionalId },
+    select: { professional: { select: { slug: true } } },
   });
 
+  if (!block) {
+    return { error: "Bloqueio não encontrado nesta conta." };
+  }
+
+  const result = await prisma.calendarBlock.deleteMany({
+    where: { id: blockId, professionalId },
+  });
   if (result.count !== 1) {
     return { error: "Bloqueio não encontrado nesta conta." };
   }
 
   revalidatePath("/dashboard/calendar");
+  revalidatePath(`/agendar/${block.professional.slug}`);
   return { success: "Bloqueio removido." };
 }
 
@@ -385,14 +375,17 @@ export async function updateAppointmentStatusAction(
   const professionalId = await getAuthenticatedProfessionalId();
   const appointmentId = formData.get("appointmentId");
   const intent = formData.get("intent");
+  const paidValue = formData.get("paid");
 
   if (
     typeof appointmentId !== "string" ||
     !appointmentId.trim() ||
-    (intent !== "cancel" && intent !== "complete" && intent !== "confirm")
+    (intent !== "cancel" && intent !== "complete" && intent !== "confirm") ||
+    (intent === "complete" && paidValue !== "yes" && paidValue !== "no")
   ) {
     return { error: "Ação de atendimento inválida." };
   }
+  const wasPaid = paidValue === "yes";
 
   const prisma = getPrismaClient();
   const appointment = await prisma.appointment.findFirst({
@@ -470,7 +463,11 @@ export async function updateAppointmentStatusAction(
 
     if (intent === "complete") {
       const description = `${appointment.service.name} · ${appointment.client.name}`;
-      const paidAt = new Date();
+      const completedAt = new Date();
+      const paidAt = wasPaid ? completedAt : null;
+      const incomeStatus = wasPaid
+        ? TransactionStatus.PAID
+        : TransactionStatus.PENDING;
       await transaction.transaction.upsert({
         where: {
           appointmentId_type: {
@@ -482,7 +479,7 @@ export async function updateAppointmentStatusAction(
           professionalId,
           appointmentId: appointment.id,
           type: TransactionType.INCOME,
-          status: TransactionStatus.PAID,
+          status: incomeStatus,
           amount: appointment.priceAtBooking,
           description,
           category: "Atendimento",
@@ -490,7 +487,7 @@ export async function updateAppointmentStatusAction(
           paidAt,
         },
         update: {
-          status: TransactionStatus.PAID,
+          status: incomeStatus,
           amount: appointment.priceAtBooking,
           paidAt,
         },
@@ -511,12 +508,12 @@ export async function updateAppointmentStatusAction(
           description: `Materiais · ${description}`,
           category: "Custo Operacional",
           dueAt: appointment.startsAt,
-          paidAt,
+          paidAt: completedAt,
         },
         update: {
           status: TransactionStatus.PAID,
           amount: appointment.service.materialCost,
-          paidAt,
+          paidAt: completedAt,
         },
       });
     }
@@ -539,7 +536,9 @@ export async function updateAppointmentStatusAction(
         ? "Atendimento cancelado."
         : intent === "confirm"
           ? "Atendimento confirmado."
-          : "Atendimento concluído.",
+          : wasPaid
+            ? "Atendimento concluído e pagamento registrado."
+            : "Atendimento concluído. A receita ficou pendente; marque-a como paga na tela Financeiro quando receber.",
   };
 }
 
