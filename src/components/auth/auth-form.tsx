@@ -203,7 +203,7 @@ export function AuthForm({
   return (
     <section className="w-full max-w-md rounded-[28px] border border-white/80 bg-white/90 p-7 shadow-[0_24px_70px_rgba(66,47,78,0.12)] backdrop-blur-xl sm:p-9">
       <header className="mb-8">
-        <div className="relative mb-3 h-[160px] w-[300px] max-w-full overflow-hidden">
+        <div className="relative mx-auto mb-3 h-[160px] w-[300px] max-w-full overflow-hidden">
           <Image
             alt="Vitta Beauty"
             className="absolute left-1/2 top-1/2 h-[267px] w-[400px] max-w-none -translate-x-1/2 -translate-y-[40%]"
@@ -214,7 +214,7 @@ export function AuthForm({
           />
         </div>
         <h1 className="text-[28px] font-semibold tracking-[-0.04em] text-vitta-text">
-          Bem-vinda de volta
+          Bem-vinda a Vitta Beauty!
         </h1>
         <p className="mt-2 text-sm leading-6 text-vitta-muted">
           Entre para acessar seu espaço de gestão.
