@@ -7,6 +7,7 @@ import type { FormState } from "@/app/actions/auth";
 import { getAuthenticatedProfessionalId } from "@/lib/authenticated-professional";
 import { hasValidProfessionalName } from "@/lib/professional-validation";
 import { verifyFirebaseIdToken } from "@/lib/verify-firebase-token";
+import { getFirebaseAdminAuth } from "@/lib/firebase-admin-auth";
 import {
   clearFirebaseSession,
   getFirebaseSession,
@@ -87,7 +88,6 @@ export async function updateProfessionalDetailsAction(
 }
 
 export async function syncProfessionalEmailFromFirebaseAction(
-  idToken: string,
 ): Promise<FormState> {
   const session = await getFirebaseSession();
   if (!session) {
@@ -98,8 +98,39 @@ export async function syncProfessionalEmailFromFirebaseAction(
     return { error: "Sua sessão expirou. Entre novamente para continuar." };
   }
 
-  const identity = await verifyFirebaseIdToken(idToken);
-  if (!identity || identity.uid !== session.uid || !identity.emailVerified) {
+  let firebaseUser;
+  try {
+    firebaseUser = await getFirebaseAdminAuth().getUser(session.uid);
+  } catch (error) {
+    logAuthEvent("account.email_sync_rejected", {
+      outcome: "failed",
+      code:
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        typeof error.code === "string"
+          ? error.code
+          : error instanceof Error
+            ? error.name
+            : "UNKNOWN_ERROR",
+    });
+    return {
+      error:
+        "Não foi possível consultar a conta Firebase. Tente atualizar a página.",
+    };
+  }
+
+  const identity = {
+    uid: firebaseUser.uid,
+    email: firebaseUser.email,
+    emailVerified: firebaseUser.emailVerified,
+    providers: firebaseUser.providerData.map((provider) => provider.providerId),
+  };
+  if (
+    identity.uid !== session.uid ||
+    !identity.email ||
+    !identity.emailVerified
+  ) {
     logAuthEvent("account.email_sync_rejected", {
       outcome: "rejected",
       code: "FIREBASE_IDENTITY_MISMATCH_OR_UNVERIFIED",

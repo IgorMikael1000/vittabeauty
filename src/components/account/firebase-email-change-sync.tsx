@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { onAuthStateChanged, reload, signOut } from "firebase/auth";
+import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { syncProfessionalEmailFromFirebaseAction } from "@/app/actions/account";
 import { auth } from "@/lib/firebase";
@@ -16,25 +16,12 @@ export function FirebaseEmailChangeSync() {
 
   useEffect(() => {
     let active = true;
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (started.current) return;
-      started.current = true;
+    if (started.current) return;
+    started.current = true;
 
-      if (!user) {
-        if (active) {
-          setFailed(true);
-          setMessage(
-            "O Firebase confirmou a alteração, mas não encontramos sua sessão. Entre novamente para sincronizar o e-mail.",
-          );
-        }
-        return;
-      }
-
+    void (async () => {
       try {
-        await reload(user);
-        const result = await syncProfessionalEmailFromFirebaseAction(
-          await user.getIdToken(true),
-        );
+        const result = await syncProfessionalEmailFromFirebaseAction();
         if (result.error) {
           if (active) {
             setFailed(true);
@@ -62,11 +49,10 @@ export function FirebaseEmailChangeSync() {
           );
         }
       }
-    });
+    })();
 
     return () => {
       active = false;
-      unsubscribe();
     };
   }, [router]);
 

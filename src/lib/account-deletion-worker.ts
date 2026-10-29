@@ -1,35 +1,12 @@
 import "server-only";
 
-import { cert, getApps, initializeApp } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
 import { v2 as cloudinary } from "cloudinary";
+import { getFirebaseAdminAuth } from "@/lib/firebase-admin-auth";
 import { getPrismaClient } from "@/lib/prisma";
 import { getAccountDeletionRetryDelayMs } from "@/lib/account-deletion-retry";
 
 const jobLeaseMs = 5 * 60 * 1000;
 const deletionBatchSize = 5;
-
-function getFirebaseAdminAuth() {
-  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(
-    /\\n/g,
-    "\n",
-  );
-  if (!projectId || !clientEmail || !privateKey) {
-    throw new Error("FIREBASE_ADMIN_CREDENTIALS_NOT_CONFIGURED");
-  }
-
-  const app =
-    getApps().find((candidate) => candidate.name === "account-deletion-worker") ??
-    initializeApp(
-      {
-        credential: cert({ projectId, clientEmail, privateKey }),
-      },
-      "account-deletion-worker",
-    );
-  return getAuth(app);
-}
 
 function getSafeErrorCode(error: unknown): string {
   const code =
