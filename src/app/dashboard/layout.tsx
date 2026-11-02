@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -9,6 +10,13 @@ import { WelcomeTour } from "@/components/onboarding/welcome-tour";
 import { PlanCards } from "@/components/subscription/plan-cards";
 import { getAuthenticatedProfessionalId } from "@/lib/authenticated-professional";
 import { getPrismaClient } from "@/lib/prisma";
+
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 export default async function DashboardLayout({
   children,
@@ -155,7 +163,7 @@ export default async function DashboardLayout({
             </Link>
           </div>
         </header>
-        <div className="flex-1 px-4 py-7 sm:px-8 sm:py-9 md:px-10">{children}</div>
+        <main className="flex-1 px-4 py-7 sm:px-8 sm:py-9 md:px-10">{children}</main>
       </div>
       </div>
       {isExpired && (

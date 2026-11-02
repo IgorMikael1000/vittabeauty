@@ -52,6 +52,10 @@ export async function generateMetadata({
     return {
       title: "Página não encontrada",
       description: "Este link de agendamento não está disponível.",
+      robots: {
+        index: false,
+        follow: false,
+      },
     };
   }
 
@@ -72,10 +76,19 @@ export async function generateMetadata({
   return {
     title: `Agendar com ${professional.name}`,
     description,
+    alternates: {
+      canonical: `/agendar/${encodeURIComponent(slug)}`,
+    },
+    robots: {
+      index: false,
+      follow: true,
+    },
     openGraph: {
       title: `Agendar com ${professional.name}`,
       description,
       type: "website",
+      siteName: "Vitta Beauty",
+      locale: "pt_BR",
       images: [
         {
           url: profileImageUrl,

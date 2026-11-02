@@ -94,6 +94,29 @@ const steps = [
   },
 ];
 
+const faqs = [
+  {
+    question: "As clientes precisam criar uma conta para agendar?",
+    answer:
+      "Não. A cliente pode abrir o link público, consultar os serviços e horários disponíveis e solicitar um agendamento sem criar uma conta.",
+  },
+  {
+    question: "Posso configurar meus serviços e horários?",
+    answer:
+      "Sim. Você pode cadastrar serviços e configurar seus dias e horários de atendimento, pausas e bloqueios na agenda.",
+  },
+  {
+    question: "Como funciona o sinal manual por Pix?",
+    answer:
+      "No modo manual, você cadastra sua chave Pix e confere o pagamento na conta correspondente antes de confirmar o agendamento.",
+  },
+  {
+    question: "O Vitta confirma automaticamente o sinal?",
+    answer:
+      "A confirmação automática está disponível ao conectar uma conta Mercado Pago. A disponibilidade e as condições dependem da configuração da profissional e do provedor.",
+  },
+];
+
 export function LandingPage() {
   return (
     <div className={styles.page}>
@@ -131,7 +154,7 @@ export function LandingPage() {
                 PARA PROFISSIONAIS DA BELEZA
               </span>
               <h1 id="hero-title">
-                Seu talento merece uma <em>agenda à altura.</em>
+                Sua agenda online, feita para profissionais da <em>beleza.</em>
               </h1>
               <p className={styles.heroDescription}>
                 Organize seus serviços, compartilhe seu link de agendamento e
@@ -210,7 +233,7 @@ export function LandingPage() {
                   </div>
                   <div className={styles.bookingIntro}>
                     <span>SEU MOMENTO DE CUIDADO</span>
-                    <h2>Escolha seu serviço</h2>
+                    <div className={styles.bookingServiceTitle}>Escolha seu serviço</div>
                     <p>Encontre o cuidado ideal para você.</p>
                   </div>
                   <div className={styles.serviceOption}>
@@ -437,6 +460,29 @@ export function LandingPage() {
           </div>
         </section>
 
+        <section aria-labelledby="faq-title" className={styles.faqSection}>
+          <div className={styles.sectionHeading}>
+            <span className={styles.eyebrow}>DÚVIDAS FREQUENTES</span>
+            <h2 id="faq-title">
+              Quer saber mais
+              <br />
+              <em>sobre o Vitta?</em>
+            </h2>
+            <p>
+              Respostas diretas sobre agendamento, organização da agenda e
+              configuração de sinal.
+            </p>
+          </div>
+          <div className={styles.faqList}>
+            {faqs.map(({ question, answer }) => (
+              <details className={styles.faqItem} key={question}>
+                <summary>{question}</summary>
+                <p>{answer}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+
         <section aria-labelledby="cta-title" className={styles.finalCta}>
           <div className={styles.ctaDecoration} />
           <span className={styles.ctaSparkle}>✳</span>
@@ -465,6 +511,7 @@ export function LandingPage() {
         </Link>
         <p>Seu trabalho merece cuidado. Sua rotina também.</p>
         <div className={styles.footerLinks}>
+          <Link href="/sobre">Sobre o Vitta</Link>
           <Link href="/termos">Termos e privacidade</Link>
           <Link href="/login">Entrar</Link>
           <Link href="/cadastro">Criar meu espaço</Link>

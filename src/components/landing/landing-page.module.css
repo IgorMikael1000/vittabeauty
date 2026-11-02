@@ -488,7 +488,7 @@
   letter-spacing: 0.12em;
 }
 
-.bookingIntro h2 {
+.bookingServiceTitle {
   margin: 5px 0 3px;
   color: #3c2d45;
   font-family: Georgia, "Times New Roman", serif;
@@ -718,7 +718,8 @@
 .howSection,
 .videoSection,
 .featuresSection,
-.depositSection {
+.depositSection,
+.faqSection {
   width: min(1100px, calc(100% - 64px));
   margin: 0 auto;
 }
@@ -963,6 +964,44 @@
   gap: 83px;
   border-top: 1px solid #eee7f0;
   padding: 98px 0 108px;
+}
+
+.faqSection {
+  border-top: 1px solid #eee7f0;
+  padding: 92px 0 100px;
+}
+
+.faqList {
+  display: grid;
+  max-width: 800px;
+  gap: 12px;
+  margin: 38px auto 0;
+}
+
+.faqItem {
+  border: 1px solid #eee7f0;
+  border-radius: 17px;
+  background: #fff;
+  padding: 19px 22px;
+}
+
+.faqItem summary {
+  color: #43364b;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.6;
+}
+
+.faqItem summary::marker {
+  color: var(--purple);
+}
+
+.faqItem p {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.8;
 }
 
 .depositCopy {
@@ -1211,6 +1250,7 @@
   .videoSection,
   .featuresSection,
   .depositSection,
+  .faqSection,
   .footer {
     width: min(100% - 40px, 560px);
   }
@@ -1531,6 +1571,7 @@
   .videoSection,
   .featuresSection,
   .depositSection,
+  .faqSection,
   .footer {
     width: calc(100% - 32px);
   }

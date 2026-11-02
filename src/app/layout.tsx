@@ -4,15 +4,36 @@ import type { ReactNode } from "react";
 import { VercelAnalytics } from "@/components/analytics/vercel-analytics";
 import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
+import { getSiteOrigin } from "@/lib/site-origin";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: getSiteOrigin(),
   title: {
     default: "Vitta Beauty",
     template: "%s | Vitta Beauty",
   },
   applicationName: "Vitta Beauty",
   description: "Gestão simples e acolhedora para profissionais da beleza.",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+  openGraph: {
+    type: "website",
+    locale: "pt_BR",
+    siteName: "Vitta Beauty",
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
   manifest: "/manifest.json",
   icons: {
     icon: [
@@ -43,7 +64,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
     <html lang="pt-BR" className="h-full antialiased">
       <body className="flex min-h-full flex-col">
         <ServiceWorkerRegistration />
-        <main className="flex flex-1 flex-col">{children}</main>
+        <div className="flex flex-1 flex-col">{children}</div>
         <Suspense fallback={null}>
           <InstallPrompt />
         </Suspense>

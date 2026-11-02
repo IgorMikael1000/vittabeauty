@@ -7,6 +7,26 @@ export const metadata: Metadata = {
   title: "Termos de Uso e Política de Privacidade",
   description:
     "Consulte os Termos de Uso e a Política de Privacidade do Vitta Beauty.",
+  alternates: {
+    canonical: "/termos",
+  },
+  openGraph: {
+    title: "Termos de Uso e Política de Privacidade | Vitta Beauty",
+    description:
+      "Consulte as regras de uso e saiba como os dados são tratados pelo Vitta Beauty.",
+    url: "/termos",
+    type: "website",
+    locale: "pt_BR",
+    siteName: "Vitta Beauty",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "Vitta Beauty",
+      },
+    ],
+  },
 };
 
 type LegalBlock =
