@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import type { ReactNode } from "react";
+import { VercelAnalytics } from "@/components/analytics/vercel-analytics";
 import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import "./globals.css";
@@ -46,6 +47,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
         <Suspense fallback={null}>
           <InstallPrompt />
         </Suspense>
+        <VercelAnalytics />
         <footer className="border-t border-vitta-border px-6 py-4 text-center text-xs text-vitta-muted">
           Desenvolvido pela{" "}
           <a

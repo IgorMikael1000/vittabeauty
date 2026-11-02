@@ -2,7 +2,7 @@
 **VITTA BEAUTY**
 **TERMOS DE USO E POLÍTICA DE PRIVACIDADE**
 
-Data de vigência: 28 de outubro de 2026
+Data de vigência: 2 de novembro de 2026
 
 **IDENTIFICAÇÃO DO RESPONSÁVEL PELA PLATAFORMA**
 Responsável/mantenedor identificado na plataforma: I&T Solutions.
@@ -96,6 +96,8 @@ Encarregado pelo tratamento de dados pessoais: Igor Mikael dos Santos
 
 1.2. Em relação aos dados de terceiros (Clientes do Salão/Clínica), o profissional atua como **Controlador** (pois ele decide quem cadastrar e os detalhes do atendimento) e a I&T Solutions atua estritamente como **Operadora**, fornecendo o espaço em nuvem para que o profissional armazene sua própria agenda.
 
+1.3. Para as métricas agregadas de navegação da plataforma, a I&T Solutions atua como **Controladora** e a Vercel fornece o serviço de análise, conforme a documentação e as políticas próprias do fornecedor.
+
 **2. QUAIS DADOS PODEM SER TRATADOS**
 
 2.1. **Dados do profissional:** Nome profissional/negócio, e-mail, CPF, telefone, especialidade, foto de perfil, slug público, chave PIX e estado do plano de acesso.
@@ -103,6 +105,8 @@ Encarregado pelo tratamento de dados pessoais: Igor Mikael dos Santos
 2.2. **Dados das clientes:** Nome, WhatsApp, serviço preferido, horário, histórico e observações fornecidas pela cliente ou pelo profissional. Não devem ser inseridos dados de saúde ou dados sensíveis que não sejam estritamente necessários ao serviço de beleza.
 
 2.3. **Dados financeiros:** Serviços, preços, transações registradas no painel e identificadores de pagamento retornados pelo Mercado Pago.
+
+2.4. **Dados de navegação:** Ao utilizar o Vitta Beauty, podem ser coletadas métricas agregadas de visualização de páginas para compreender o uso e melhorar a plataforma. A Vercel Web Analytics pode processar a rota acessada, data e hora, página de origem, localização aproximada e informações de navegador, sistema operacional e tipo de dispositivo. Antes do envio, o Vitta remove parâmetros de consulta e substitui o slug identificável das páginas públicas de agendamento por uma rota genérica. A ferramenta não fornece ao Vitta o nome, e-mail ou telefone de quem visita. Segundo a documentação da Vercel, a identificação técnica temporária da sessão é descartada após 24 horas e o recurso não utiliza cookies de terceiros.
 
 **3. FINALIDADES E BASES LEGAIS**
 
@@ -114,12 +118,13 @@ Encarregado pelo tratamento de dados pessoais: Igor Mikael dos Santos
 
 * **Firebase/Google:** Autenticação segura.
 * **Neon/PostgreSQL e Vercel:** Hospedagem do banco de dados e servidores da aplicação.
+* **Vercel Web Analytics:** Métricas agregadas de navegação para compreender o uso e melhorar a plataforma.
 * **Cloudinary:** Hospedagem de fotos de perfil.
 * **Mercado Pago:** Processamento de pagamentos únicos dos planos e das renovações manuais.
 
 **5. COOKIES, SESSÃO E ARMAZENAMENTO**
 
-5.1. O Vitta Beauty utiliza cookies de sessão necessários (HTTP-only) exclusivamente para manter a autenticação e segurança da conta logada. Não utilizamos rastreadores de publicidade de terceiros na parte interna da plataforma.
+5.1. O Vitta Beauty utiliza cookies de sessão necessários (HTTP-only) exclusivamente para manter a autenticação e segurança da conta logada. A Vercel Web Analytics não utiliza cookies de terceiros para suas métricas agregadas. Não utilizamos rastreadores de publicidade de terceiros na parte interna da plataforma.
 
 **6. ARMAZENAMENTO, RETENÇÃO E EXCLUSÃO**
 
