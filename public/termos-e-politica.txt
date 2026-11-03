@@ -55,9 +55,18 @@ Encarregado pelo tratamento de dados pessoais: Igor Mikael dos Santos
 
 4.2. A solicitação pública pode coletar nome, WhatsApp, serviço, data e observações, sendo o profissional responsável por contatar a cliente e confirmar o aceite.
 
-4.3. Quando o profissional configura o pagamento de um "sinal", o aplicativo exibe a chave PIX do próprio profissional. O Vitta Beauty **não recebe, custódia, liquida nem confirma esse pagamento PIX** entre cliente e profissional. A cliente paga diretamente ao profissional, que é o único responsável pelo recebimento, reembolso e prestação de contas.
+4.3. O profissional pode configurar o sinal em uma destas modalidades:
 
-4.4. O Vitta Beauty não é parte do contrato de serviço entre profissional e cliente e não define políticas de cancelamento ou reembolso.
+* **Sinal manual:** o Vitta exibe a chave Pix informada pelo profissional. A cliente paga fora do Vitta, diretamente ao profissional. O profissional deve conferir o crédito na própria conta e confirmar o agendamento manualmente. O Vitta não recebe, custodia, liquida ou confirma pagamentos feitos por essa modalidade.
+* **Sinal automático:** após o profissional conectar e autorizar uma conta Mercado Pago, o Vitta solicita ao Mercado Pago a criação de uma cobrança Pix no valor do sinal, exibe o QR Code e o código Pix para a cliente e consulta/recebe a atualização do pagamento para registrar sua aprovação e confirmar o agendamento. O valor é processado pelo Mercado Pago na conta conectada do profissional; o Vitta não recebe nem mantém o saldo do pagamento.
+
+4.4. A conexão do Mercado Pago depende da autorização do titular ou de pessoa com poderes para operar a conta. O profissional deve conferir a conta escolhida, manter sua própria conta e credenciais seguras e cumprir as regras e condições do Mercado Pago. A autorização permite ao Vitta utilizar a integração para as operações necessárias à geração das cobranças Pix e à atualização de seus status. A conexão pode ser interrompida nas configurações do Vitta; cobranças automáticas pendentes podem precisar ser pagas ou expirar antes da troca para o modo manual. A desconexão no Vitta interrompe o uso da credencial armazenada pela plataforma, mas o profissional deve verificar e, se desejar, revogar também as autorizações diretamente nos canais do Mercado Pago.
+
+4.5. O Mercado Pago pode cobrar tarifa pela transação. No momento da publicação destes Termos, a tela de configuração do Vitta informa a tarifa de 0,99% do valor do sinal para a modalidade automática. Tarifas, disponibilidade e condições são definidas pelo Mercado Pago e podem mudar; prevalecem as condições apresentadas pelo provedor no momento da operação. O profissional deve consultar e conferir os valores aplicáveis à sua conta.
+
+4.6. A confirmação automática depende da disponibilidade do Vitta, do Mercado Pago e da comunicação de status entre os serviços. Uma demora, indisponibilidade, pagamento não aprovado ou pagamento identificado depois da expiração do horário pode impedir a confirmação automática. O profissional deve acompanhar o estado do agendamento e tratar diretamente com a cliente eventual pagamento aprovado sem confirmação do horário.
+
+4.7. O profissional define e informa à cliente, antes do pagamento, as condições do sinal, incluindo regras de cancelamento, remarcação e eventual devolução. O profissional é responsável pelo serviço contratado, pelo recebimento dos valores na conta conectada, por conciliar pagamentos, analisar pedidos de cancelamento ou reembolso e cumprir suas obrigações legais e fiscais. O Vitta não é parte do contrato de serviço entre profissional e cliente nem decide essas regras.
 
 **5. PLANOS, COBRANÇAS E MERCADO PAGO**
 
@@ -104,13 +113,13 @@ Encarregado pelo tratamento de dados pessoais: Igor Mikael dos Santos
 
 2.2. **Dados das clientes:** Nome, WhatsApp, serviço preferido, horário, histórico e observações fornecidas pela cliente ou pelo profissional. Não devem ser inseridos dados de saúde ou dados sensíveis que não sejam estritamente necessários ao serviço de beleza.
 
-2.3. **Dados financeiros:** Serviços, preços, transações registradas no painel e identificadores de pagamento retornados pelo Mercado Pago.
+2.3. **Dados financeiros e da integração de pagamentos:** Serviços, preços, valores de sinais, transações registradas no painel e identificadores, estados e datas de pagamentos retornados pelo Mercado Pago. Quando o profissional conecta uma conta, também tratamos o identificador da conta Mercado Pago, escopos e validade da autorização e credenciais técnicas de acesso e renovação armazenadas de forma criptografada. Para gerar um Pix automático, o nome e o e-mail fornecidos pela cliente, o valor do sinal e referências necessárias para associar a cobrança ao agendamento são enviados ao Mercado Pago. O registro do sinal pode incluir identificador da cobrança, status, horários, código Pix e dados do QR Code.
 
 2.4. **Dados de navegação:** Ao utilizar o Vitta Beauty, podem ser coletadas métricas agregadas de visualização de páginas para compreender o uso e melhorar a plataforma. A Vercel Web Analytics pode processar a rota acessada, data e hora, página de origem, localização aproximada e informações de navegador, sistema operacional e tipo de dispositivo. Antes do envio, o Vitta remove parâmetros de consulta e substitui o slug identificável das páginas públicas de agendamento por uma rota genérica. A ferramenta não fornece ao Vitta o nome, e-mail ou telefone de quem visita. Segundo a documentação da Vercel, a identificação técnica temporária da sessão é descartada após 24 horas e o recurso não utiliza cookies de terceiros.
 
 **3. FINALIDADES E BASES LEGAIS**
 
-3.1. Tratamos os dados para (I) execução de contrato (fornecer a agenda e o painel de gestão ao usuário); (II) cumprimento de obrigação legal (registros fiscais e logs de acesso); e (III) legítimo interesse (melhorar a plataforma e garantir segurança).
+3.1. Tratamos os dados para (I) execução dos serviços solicitados pelo usuário, incluindo conectar a conta Mercado Pago autorizada, solicitar cobranças Pix e atualizar o status dos pagamentos; (II) execução de contrato, para fornecer a agenda e o painel de gestão; (III) cumprimento de obrigação legal, quando aplicável; e (IV) legítimo interesse, para proteger a integração, prevenir uso indevido e manter a segurança da plataforma, observados os direitos dos titulares.
 
 **4. COMPARTILHAMENTO E FORNECEDORES**
 
@@ -120,7 +129,7 @@ Encarregado pelo tratamento de dados pessoais: Igor Mikael dos Santos
 * **Neon/PostgreSQL e Vercel:** Hospedagem do banco de dados e servidores da aplicação.
 * **Vercel Web Analytics:** Métricas agregadas de navegação para compreender o uso e melhorar a plataforma.
 * **Cloudinary:** Hospedagem de fotos de perfil.
-* **Mercado Pago:** Processamento de pagamentos únicos dos planos e das renovações manuais.
+* **Mercado Pago:** Processamento de pagamentos únicos dos planos e das renovações manuais; autenticação/autorização da conta conectada e processamento das cobranças Pix de sinais, com compartilhamento dos dados necessários à cobrança e à atualização do status do pagamento. O Mercado Pago trata os dados também conforme seus próprios termos e políticas.
 
 **5. COOKIES, SESSÃO E ARMAZENAMENTO**
 
@@ -128,11 +137,13 @@ Encarregado pelo tratamento de dados pessoais: Igor Mikael dos Santos
 
 **6. ARMAZENAMENTO, RETENÇÃO E EXCLUSÃO**
 
-6.1. Adotamos práticas de segurança de mercado, separação de registros e infraestrutura moderna para proteger seus dados.
+6.1. Adotamos medidas técnicas e organizacionais para proteger os dados. As credenciais de acesso e renovação da conta Mercado Pago conectada são armazenadas de forma criptografada e usadas pela aplicação para manter a integração autorizada. Nenhum sistema pode garantir segurança ou disponibilidade absolutas.
 
 6.2. **Exclusão de Conta:** O titular pode solicitar a exclusão pelo botão "Excluir minha conta" no painel de Segurança. O acesso e o agendamento público são bloqueados imediatamente. Um processo automático tenta remover os dados cadastrais e operacionais da base ativa, o usuário de autenticação Firebase e a foto de perfil hospedada no Cloudinary. Se algum fornecedor ou serviço estiver indisponível, a solicitação permanece pendente e é tentada novamente automaticamente; o titular também pode contatar o suporte para acompanhamento.
 
 6.3. **Retenção após a exclusão:** A remoção da base ativa não implica eliminação instantânea de cópias técnicas em backups, caches ou sistemas independentes dos fornecedores. Essas cópias podem permanecer pelo ciclo de retenção e descarte aplicável a cada fornecedor, com acesso restrito e sem uso operacional após a exclusão, salvo recuperação necessária de desastre. O Mercado Pago, Firebase/Google, Cloudinary, Neon e Vercel podem manter registros ou cópias conforme suas próprias políticas. Informações necessárias ao cumprimento de obrigações legais ou ao exercício regular de direitos poderão ser conservadas pelo período necessário e, quando aplicável, eliminadas ou anonimizadas ao final desse período. Para solicitar informações sobre a exclusão ou retenção, contate **itsolutions0709@gmail.com**.
+
+6.4. **Desconexão do Mercado Pago:** ao trocar para o sinal manual, a conexão e as credenciais armazenadas pelo Vitta são removidas da base ativa, e a plataforma deixa de utilizá-las para novas cobranças. Registros de pagamentos e agendamentos já realizados podem permanecer enquanto necessários para a operação do histórico e para cumprir obrigações legais, conforme esta Política. A desconexão feita no Vitta não apaga registros mantidos pelo Mercado Pago nem necessariamente revoga, nos sistemas do provedor, a autorização concedida; o profissional pode gerenciar essa autorização diretamente com o Mercado Pago.
 
 **7. DIREITOS DOS TITULARES**
 
